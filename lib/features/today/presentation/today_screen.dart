@@ -102,77 +102,67 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                         reduceMotion: settings.reduceMotion,
                         onRequestEdit: () =>
                             setState(() => _editingLayout = true),
-                        onMove: (moving, target) => ref
+                        onReorder: (moving, visibleIndex) => ref
                             .read(todayLayoutProvider.notifier)
-                            .moveBefore(moving, target),
-                        onResize: (id, delta) => ref
+                            .moveToVisibleIndex(moving, visibleIndex),
+                        onResize: (id, size) => ref
                             .read(todayLayoutProvider.notifier)
-                            .resizeByDelta(id, delta),
+                            .setSize(id, size),
                         onHide: (id) => ref
                             .read(todayLayoutProvider.notifier)
                             .setVisible(id, false),
                         children: {
-                          TodayTileId.command: TodayCommandSummary(
+                          TodayTileId.command: (size) => TodayCommandSummary(
+                            size: size,
                             viewModel: viewModel,
                             weatherHint: _weatherHint(weather, viewModel.now),
                           ),
-                          TodayTileId.timeline: TodayCourseTimeline(
+                          TodayTileId.timeline: (size) => TodayCourseTimeline(
+                            size: size,
                             courses: viewModel.courses,
                             onOpenSchedule: () => context.go('/schedule'),
                           ),
-                          TodayTileId.tasks: TodayTaskPanel(
+                          TodayTileId.tasks: (size) => TodayTaskPanel(
+                            size: size,
                             tasks: viewModel.dayTasks,
-                            compact:
-                                layout
-                                    .where(
-                                      (item) => item.id == TodayTileId.tasks,
-                                    )
-                                    .firstOrNull
-                                    ?.size
-                                    .rows ==
-                                1,
                             onAdd: () => showDayPlannerSheet(
                               context,
                               date: viewModel.now,
                             ),
                             onToggle: controller.toggleDayTask,
                           ),
-                          TodayTileId.courseWork: TodayCourseWorkPanel(
-                            plans: viewModel.coursePlans,
-                            courses: schedule.courses,
-                            compact:
-                                layout
-                                    .where(
-                                      (item) =>
-                                          item.id == TodayTileId.courseWork,
-                                    )
-                                    .firstOrNull
-                                    ?.size
-                                    .rows ==
-                                1,
-                            onToggle: (plan) async {
-                              if (!plan.completed &&
-                                  !await confirmCoursePlanCompletion(
-                                    context,
-                                    plan,
-                                  )) {
-                                return;
-                              }
-                              controller.setCoursePlanCompleted(
-                                plan.id,
-                                !plan.completed,
-                              );
-                            },
-                            onOpen: (plan) {
-                              final course = schedule.courses
-                                  .where((item) => item.id == plan.courseId)
-                                  .firstOrNull;
-                              if (course != null) {
-                                showCoursePlanSheet(context, course: course);
-                              }
-                            },
-                          ),
-                          TodayTileId.materials: TodayMaterialsPanel(
+                          TodayTileId.courseWork: (size) =>
+                              TodayCourseWorkPanel(
+                                size: size,
+                                plans: viewModel.coursePlans,
+                                courses: schedule.courses,
+                                onToggle: (plan) async {
+                                  if (!plan.completed &&
+                                      !await confirmCoursePlanCompletion(
+                                        context,
+                                        plan,
+                                      )) {
+                                    return;
+                                  }
+                                  controller.setCoursePlanCompleted(
+                                    plan.id,
+                                    !plan.completed,
+                                  );
+                                },
+                                onOpen: (plan) {
+                                  final course = schedule.courses
+                                      .where((item) => item.id == plan.courseId)
+                                      .firstOrNull;
+                                  if (course != null) {
+                                    showCoursePlanSheet(
+                                      context,
+                                      course: course,
+                                    );
+                                  }
+                                },
+                              ),
+                          TodayTileId.materials: (size) => TodayMaterialsPanel(
+                            size: size,
                             materials: [
                               for (final item in viewModel.courses)
                                 if (item.course.materials.isNotEmpty)
@@ -183,16 +173,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               course: course,
                             ),
                             onEmptyTap: () => context.go('/schedule'),
-                            compact:
-                                layout
-                                    .where(
-                                      (item) =>
-                                          item.id == TodayTileId.materials,
-                                    )
-                                    .firstOrNull
-                                    ?.size
-                                    .rows ==
-                                1,
                           ),
                         },
                       ),

@@ -10,7 +10,13 @@ import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_theme.dart';
 import 'package:yotsuba_schedule/data/weather/weather_repository.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
+import 'package:yotsuba_schedule/domain/models/course_plan.dart';
+import 'package:yotsuba_schedule/domain/models/day_task.dart';
 import 'package:yotsuba_schedule/features/today/application/today_layout_controller.dart';
+import 'package:yotsuba_schedule/features/today/application/today_view_model.dart';
+import 'package:yotsuba_schedule/features/today/presentation/widgets/today_command_summary.dart';
+import 'package:yotsuba_schedule/features/today/presentation/widgets/today_course_timeline.dart';
+import 'package:yotsuba_schedule/features/today/presentation/widgets/today_dashboard_grid.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_readiness_board.dart';
 
 void main() {
@@ -37,12 +43,42 @@ void main() {
         TodayTileId.tasks,
       ]);
       expect(layout.first.visible, isFalse);
-      expect(layout.first.size, TodayTileSize.twoByOne);
-      expect(layout[1].size, TodayTileSize.oneByOne);
-      expect(layout[2].size, TodayTileSize.oneByOne);
-      expect(preferences.getString('today.dashboard.layout.v2'), isNotNull);
+      expect(layout.first.size, TodayTileSize.twoByTwo);
+      expect(layout[1].size, TodayTileSize.twoByTwo);
+      expect(layout[2].size, TodayTileSize.twoByTwo);
+      expect(preferences.getString('today.dashboard.layout.v3'), isNotNull);
     },
   );
+
+  test('reordering visible widgets keeps hidden widget slots intact', () async {
+    SharedPreferences.setMockInitialValues({
+      'today.dashboard.layout.v3': jsonEncode([
+        {'id': 'command', 'size': 'twoByTwo', 'visible': true},
+        {'id': 'materials', 'size': 'twoByOne', 'visible': false},
+        {'id': 'tasks', 'size': 'oneByOne', 'visible': true},
+        {'id': 'courseWork', 'size': 'oneByOne', 'visible': true},
+        {'id': 'timeline', 'size': 'twoByTwo', 'visible': true},
+      ]),
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final container = ProviderContainer(
+      overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
+    );
+    addTearDown(container.dispose);
+
+    container
+        .read(todayLayoutProvider.notifier)
+        .moveToVisibleIndex(TodayTileId.timeline, 1);
+    final layout = container.read(todayLayoutProvider);
+    expect(layout[1].id, TodayTileId.materials);
+    expect(layout[1].visible, isFalse);
+    expect(layout.where((item) => item.visible).map((item) => item.id), [
+      TodayTileId.command,
+      TodayTileId.timeline,
+      TodayTileId.tasks,
+      TodayTileId.courseWork,
+    ]);
+  });
 
   test('weather response tolerates nullable forecast values', () async {
     final client = MockClient((_) async {
@@ -73,7 +109,7 @@ void main() {
     expect(snapshot.daily.last.temperatureMax, 0);
   });
 
-  testWidgets('materials panel fits both half and full dashboard widths', (
+  testWidgets('dashboard widgets fit every supported tile size at 320px', (
     tester,
   ) async {
     const courses = [
@@ -103,26 +139,47 @@ void main() {
       ),
     ];
 
-    Future<void> pumpAt(double width) async {
+    final plans = [
+      CoursePlan(
+        id: 'plan-1',
+        courseId: courses.first.id,
+        title: '完成交互原型与说明文档',
+        estimatedMinutes: 90,
+        dueAt: DateTime(2026, 7, 28),
+      ),
+    ];
+    const tasks = [
+      DayTask(id: 'task-1', dateKey: '2026-07-26', title: '整理课堂笔记并提交反馈'),
+    ];
+    final timeline = [
+      TodayCourse(
+        course: courses.first,
+        startMinutes: 480,
+        endMinutes: 570,
+        status: TodayCourseStatus.upcoming,
+        timeLabel: '08:00-09:30',
+      ),
+    ];
+    final viewModel = TodayViewModel(
+      now: DateTime(2026, 7, 26, 7, 30),
+      courses: timeline,
+      dayTasks: tasks,
+      coursePlans: plans,
+      progress: 0.35,
+      remainingMinutes: 90,
+      gapSuggestion: '提前准备课程资料',
+    );
+
+    Future<void> pumpTile(TodayTileSize size, Widget child) async {
+      final width = size.columns == 1 ? 142.0 : 296.0;
+      final height = size.rows == 1 ? 152.0 : 316.0;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
           home: Scaffold(
             body: Align(
               alignment: Alignment.topLeft,
-              child: SizedBox(
-                width: width,
-                height: 152,
-                child: TodayMaterialsPanel(
-                  materials: [
-                    (courses[0], const ['速写本', '触控笔']),
-                    (courses[1], const ['Flutter 实战', 'Type-C 转接线']),
-                  ],
-                  compact: true,
-                  onOpenCourse: (_) {},
-                  onEmptyTap: () {},
-                ),
-              ),
+              child: SizedBox(width: width, height: height, child: child),
             ),
           ),
         ),
@@ -131,8 +188,136 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    await pumpAt(170);
-    await pumpAt(354);
-    expect(find.text('今天要带什么'), findsOneWidget);
+    for (final size in TodayTileSize.values) {
+      await pumpTile(
+        size,
+        TodayCommandSummary(
+          size: size,
+          viewModel: viewModel,
+          weatherHint: '午后可能有阵雨，记得带伞',
+        ),
+      );
+      await pumpTile(
+        size,
+        TodayCourseTimeline(
+          size: size,
+          courses: timeline,
+          onOpenSchedule: () {},
+        ),
+      );
+      await pumpTile(
+        size,
+        TodayTaskPanel(
+          size: size,
+          tasks: tasks,
+          onAdd: () {},
+          onToggle: (_) {},
+        ),
+      );
+      await pumpTile(
+        size,
+        TodayCourseWorkPanel(
+          size: size,
+          plans: plans,
+          courses: courses,
+          onToggle: (_) {},
+          onOpen: (_) {},
+        ),
+      );
+      await pumpTile(
+        size,
+        TodayMaterialsPanel(
+          size: size,
+          materials: [
+            (courses[0], const ['速写本', '触控笔']),
+            (courses[1], const ['Flutter 实战', 'Type-C 转接线']),
+          ],
+          onOpenCourse: (_) {},
+          onEmptyTap: () {},
+        ),
+      );
+    }
   });
+
+  testWidgets(
+    'dashboard previews drag placement and corner resize before commit',
+    (tester) async {
+      TodayTileId? movedId;
+      int? movedIndex;
+      TodayTileId? resizedId;
+      TodayTileSize? resizedSize;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 296,
+                child: TodayDashboardGrid(
+                  layout: const [
+                    TodayTileConfig(
+                      id: TodayTileId.tasks,
+                      size: TodayTileSize.oneByOne,
+                    ),
+                    TodayTileConfig(
+                      id: TodayTileId.courseWork,
+                      size: TodayTileSize.oneByOne,
+                    ),
+                  ],
+                  editing: true,
+                  reduceMotion: true,
+                  onRequestEdit: () {},
+                  onReorder: (id, index) {
+                    movedId = id;
+                    movedIndex = index;
+                  },
+                  onResize: (id, size) {
+                    resizedId = id;
+                    resizedSize = size;
+                  },
+                  onHide: (_) {},
+                  children: {
+                    TodayTileId.tasks: (_) =>
+                        const ColoredBox(color: Color(0xFFEFF4FF)),
+                    TodayTileId.courseWork: (_) =>
+                        const ColoredBox(color: Color(0xFFFFF4EA)),
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final taskTile = find.byKey(const ValueKey(TodayTileId.tasks));
+      final workTile = find.byKey(const ValueKey(TodayTileId.courseWork));
+      final drag = await tester.startGesture(tester.getCenter(workTile));
+      await tester.pump(const Duration(milliseconds: 140));
+      await drag.moveTo(tester.getCenter(taskTile));
+      await tester.pump();
+      await drag.up();
+      await tester.pump();
+
+      expect(movedId, TodayTileId.courseWork);
+      expect(movedIndex, 0);
+
+      final resizeHandle = find.bySemanticsLabel('从右下角缩放当天待办');
+      expect(resizeHandle, findsOneWidget);
+      final resize = await tester.startGesture(tester.getCenter(resizeHandle));
+      await tester.pump();
+      await resize.moveBy(const Offset(36, 36));
+      await tester.pump();
+      await resize.moveBy(const Offset(36, 36));
+      await tester.pump();
+      await resize.up();
+      await tester.pump();
+
+      expect(resizedId, TodayTileId.tasks);
+      expect(resizedSize, TodayTileSize.twoByTwo);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

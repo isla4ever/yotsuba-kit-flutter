@@ -4,6 +4,7 @@ import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 import 'package:yotsuba_schedule/domain/models/day_task.dart';
+import 'package:yotsuba_schedule/features/today/application/today_layout_controller.dart';
 import 'package:yotsuba_schedule/features/today/application/today_view_model.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_panel.dart';
 
@@ -43,17 +44,20 @@ class TodayReadinessBoard extends StatelessWidget {
           (item.course, item.course.materials),
     ];
     final taskPanel = TodayTaskPanel(
+      size: TodayTileSize.twoByTwo,
       tasks: dayTasks,
       onAdd: onAddTask,
       onToggle: onToggleTask,
     );
     final workPanel = TodayCourseWorkPanel(
+      size: TodayTileSize.twoByTwo,
       plans: coursePlans,
       courses: courses,
       onToggle: onTogglePlan,
       onOpen: onOpenPlan,
     );
     final materialPanel = TodayMaterialsPanel(
+      size: TodayTileSize.twoByTwo,
       materials: materials,
       onOpenCourse: onOpenMaterials,
       onEmptyTap: onOpenSchedule,
@@ -86,52 +90,144 @@ class TodayReadinessBoard extends StatelessWidget {
 
 class TodayTaskPanel extends StatelessWidget {
   const TodayTaskPanel({
+    required this.size,
     required this.tasks,
     required this.onAdd,
     required this.onToggle,
-    this.compact = false,
     super.key,
   });
 
+  final TodayTileSize size;
   final List<DayTask> tasks;
   final VoidCallback onAdd;
   final ValueChanged<String> onToggle;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final compact = size == TodayTileSize.oneByOne;
+    final itemLimit = switch (size) {
+      TodayTileSize.oneByOne => 1,
+      TodayTileSize.twoByOne => 2,
+      TodayTileSize.oneByTwo => 4,
+      TodayTileSize.twoByTwo => 3,
+    };
+    final visible = tasks.take(itemLimit).toList();
     return TodayPanel(
-      padding: EdgeInsets.all(compact ? 12 : 16),
+      padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
         children: [
-          TodaySectionHeading(
+          _DashboardPanelHeading(
+            icon: Icons.task_alt_rounded,
             eyebrow: '当天待办',
             title: '还要做什么',
+            compact: compact,
             trailing: IconButton(
               tooltip: '添加当天待办',
               onPressed: onAdd,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-              icon: const Icon(Icons.add_rounded, size: 21),
+              constraints: BoxConstraints.tightFor(
+                width: compact ? 26 : 34,
+                height: compact ? 26 : 34,
+              ),
+              icon: Icon(Icons.add_rounded, size: compact ? 18 : 21),
             ),
           ),
-          if (tasks.isEmpty)
-            _PanelEmpty(
-              icon: Icons.task_alt_rounded,
-              label: '今天还没有待办',
-              onTap: onAdd,
-              compact: compact,
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                children: [
-                  for (final task in tasks.take(compact ? 1 : 3))
-                    _TaskRow(task: task, onTap: () => onToggle(task.id)),
-                ],
-              ),
+          SizedBox(height: compact ? 6 : 9),
+          if (size == TodayTileSize.twoByTwo) ...[
+            _TaskStats(tasks: tasks),
+            const SizedBox(height: 8),
+          ],
+          Expanded(
+            child: visible.isEmpty
+                ? _PanelEmpty(
+                    icon: Icons.task_alt_rounded,
+                    label: '今天还没有待办',
+                    onTap: onAdd,
+                    compact: compact,
+                  )
+                : size == TodayTileSize.twoByOne
+                ? Row(
+                    children: [
+                      for (var index = 0; index < visible.length; index++) ...[
+                        Expanded(
+                          child: _TaskSummary(
+                            task: visible[index],
+                            onTap: () => onToggle(visible[index].id),
+                          ),
+                        ),
+                        if (index != visible.length - 1)
+                          const SizedBox(width: 7),
+                      ],
+                    ],
+                  )
+                : ListView.separated(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: visible.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 3),
+                    itemBuilder: (context, index) => _TaskRow(
+                      task: visible[index],
+                      compact: compact,
+                      onTap: () => onToggle(visible[index].id),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskStats extends StatelessWidget {
+  const _TaskStats({required this.tasks});
+
+  final List<DayTask> tasks;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final completed = tasks.where((task) => task.completed).length;
+    final progress = tasks.isEmpty ? 0.0 : completed / tasks.length;
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: palette.blueSoft.withValues(alpha: 0.66),
+        border: Border.all(color: palette.blue.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 42,
+            height: 42,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 4.5,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: palette.track,
+                  valueColor: AlwaysStoppedAnimation(palette.blue),
+                ),
+                Text(
+                  '${(progress * 100).round()}%',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: palette.text,
+                  ),
+                ),
+              ],
             ),
+          ),
+          const SizedBox(width: 12),
+          _StatMetric(label: '已完成', value: '$completed'),
+          _StatDivider(color: palette.border),
+          _StatMetric(label: '待处理', value: '${tasks.length - completed}'),
+          _StatDivider(color: palette.border),
+          _StatMetric(label: '今日总计', value: '${tasks.length}'),
         ],
       ),
     );
@@ -139,9 +235,14 @@ class TodayTaskPanel extends StatelessWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.onTap});
+  const _TaskRow({
+    required this.task,
+    required this.compact,
+    required this.onTap,
+  });
 
   final DayTask task;
+  final bool compact;
   final VoidCallback onTap;
 
   @override
@@ -149,39 +250,21 @@ class _TaskRow extends StatelessWidget {
     final palette = context.palette;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(5),
       child: SizedBox(
-        height: 44,
+        height: compact ? 62 : 42,
         child: Row(
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: task.completed
-                    ? palette.todayAccent
-                    : Colors.transparent,
-                border: Border.all(
-                  color: task.completed ? palette.todayAccent : palette.border,
-                ),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: task.completed
-                  ? const Icon(
-                      Icons.check_rounded,
-                      size: 16,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 9),
+            _CheckMark(completed: task.completed, compact: compact),
+            SizedBox(width: compact ? 7 : 9),
             Expanded(
               child: Text(
                 task.title,
-                maxLines: 1,
+                maxLines: compact ? 2 : 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13,
+                  height: 1.2,
+                  fontSize: compact ? 11 : 13,
                   color: task.completed ? palette.textFaint : palette.text,
                   decoration: task.completed
                       ? TextDecoration.lineThrough
@@ -196,59 +279,245 @@ class _TaskRow extends StatelessWidget {
   }
 }
 
-class TodayCourseWorkPanel extends StatelessWidget {
-  const TodayCourseWorkPanel({
-    required this.plans,
-    required this.courses,
-    required this.onToggle,
-    required this.onOpen,
-    this.compact = false,
-    super.key,
-  });
+class _TaskSummary extends StatelessWidget {
+  const _TaskSummary({required this.task, required this.onTap});
 
-  final List<CoursePlan> plans;
-  final List<Course> courses;
-  final ValueChanged<CoursePlan> onToggle;
-  final ValueChanged<CoursePlan> onOpen;
+  final DayTask task;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        height: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        decoration: BoxDecoration(
+          color: palette.surfaceMuted,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            _CheckMark(completed: task.completed, compact: true),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                task.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  height: 1.15,
+                  fontSize: 11,
+                  color: task.completed ? palette.textFaint : palette.text,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckMark extends StatelessWidget {
+  const _CheckMark({required this.completed, required this.compact});
+
+  final bool completed;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    final extent = compact ? 19.0 : 22.0;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: extent,
+      height: extent,
+      decoration: BoxDecoration(
+        color: completed ? palette.todayAccent : Colors.transparent,
+        border: Border.all(
+          color: completed ? palette.todayAccent : palette.border,
+        ),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: completed
+          ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+          : null,
+    );
+  }
+}
+
+class TodayCourseWorkPanel extends StatelessWidget {
+  const TodayCourseWorkPanel({
+    required this.size,
+    required this.plans,
+    required this.courses,
+    required this.onToggle,
+    required this.onOpen,
+    super.key,
+  });
+
+  final TodayTileSize size;
+  final List<CoursePlan> plans;
+  final List<Course> courses;
+  final ValueChanged<CoursePlan> onToggle;
+  final ValueChanged<CoursePlan> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = size == TodayTileSize.oneByOne;
+    final itemLimit = switch (size) {
+      TodayTileSize.oneByOne => 1,
+      TodayTileSize.twoByOne => 2,
+      TodayTileSize.oneByTwo => 3,
+      TodayTileSize.twoByTwo => 3,
+    };
     final pending = plans
         .where((plan) => !plan.completed)
-        .take(compact ? 1 : 3)
+        .take(itemLimit)
         .toList();
     return TodayPanel(
-      padding: EdgeInsets.all(compact ? 12 : 16),
+      padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
         children: [
-          const TodaySectionHeading(eyebrow: '课程作业', title: '临近截止'),
-          if (pending.isEmpty)
-            const _PanelEmpty(
-              icon: Icons.library_books_outlined,
-              label: '暂无待完成作业',
-              compact: true,
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                children: [
-                  for (final plan in pending)
-                    _WorkRow(
-                      plan: plan,
-                      courseName:
-                          courses
-                              .where((course) => course.id == plan.courseId)
-                              .map((course) => course.name)
-                              .firstOrNull ??
-                          '课程计划',
-                      onToggle: () => onToggle(plan),
-                      onOpen: () => onOpen(plan),
+          _DashboardPanelHeading(
+            icon: Icons.library_books_outlined,
+            eyebrow: '课程作业',
+            title: '临近截止',
+            compact: compact,
+            trailing: pending.isEmpty
+                ? null
+                : _CountBadge(count: pending.length, unit: '项'),
+          ),
+          SizedBox(height: compact ? 6 : 9),
+          if (size == TodayTileSize.twoByTwo) ...[
+            _WorkStats(plans: pending),
+            const SizedBox(height: 8),
+          ],
+          Expanded(
+            child: pending.isEmpty
+                ? const _PanelEmpty(
+                    icon: Icons.library_books_outlined,
+                    label: '暂无待完成作业',
+                    compact: true,
+                  )
+                : size == TodayTileSize.twoByOne
+                ? Row(
+                    children: [
+                      for (var index = 0; index < pending.length; index++) ...[
+                        Expanded(
+                          child: _WorkRow(
+                            plan: pending[index],
+                            courseName: _courseName(pending[index]),
+                            compact: true,
+                            onToggle: () => onToggle(pending[index]),
+                            onOpen: () => onOpen(pending[index]),
+                          ),
+                        ),
+                        if (index != pending.length - 1)
+                          const SizedBox(width: 7),
+                      ],
+                    ],
+                  )
+                : ListView.separated(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: pending.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 4),
+                    itemBuilder: (context, index) => _WorkRow(
+                      plan: pending[index],
+                      courseName: _courseName(pending[index]),
+                      compact: compact,
+                      onToggle: () => onToggle(pending[index]),
+                      onOpen: () => onOpen(pending[index]),
                     ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _courseName(CoursePlan plan) =>
+      courses
+          .where((course) => course.id == plan.courseId)
+          .map((course) => course.name)
+          .firstOrNull ??
+      '课程计划';
+}
+
+class _WorkStats extends StatelessWidget {
+  const _WorkStats({required this.plans});
+
+  final List<CoursePlan> plans;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final urgent = plans
+        .where((plan) => plan.priority == PlanPriority.urgent)
+        .length;
+    final high = plans
+        .where((plan) => plan.priority == PlanPriority.high)
+        .length;
+    final regular = plans.length - urgent - high;
+    final minutes = plans.fold<int>(
+      0,
+      (total, plan) => total + plan.estimatedMinutes,
+    );
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  if (urgent > 0)
+                    Expanded(
+                      flex: urgent,
+                      child: ColoredBox(color: palette.danger),
+                    ),
+                  if (high > 0)
+                    Expanded(
+                      flex: high,
+                      child: ColoredBox(color: palette.warning),
+                    ),
+                  Expanded(
+                    flex: regular == 0 ? 1 : regular,
+                    child: ColoredBox(color: palette.blue),
+                  ),
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _LegendDot(color: palette.danger, label: '紧急 $urgent'),
+              const SizedBox(width: 10),
+              _LegendDot(color: palette.warning, label: '高优 $high'),
+              const Spacer(),
+              Text(
+                '预计 $minutes 分钟',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: palette.textSoft,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -259,12 +528,14 @@ class _WorkRow extends StatelessWidget {
   const _WorkRow({
     required this.plan,
     required this.courseName,
+    required this.compact,
     required this.onToggle,
     required this.onOpen,
   });
 
   final CoursePlan plan;
   final String courseName;
+  final bool compact;
   final VoidCallback onToggle;
   final VoidCallback onOpen;
 
@@ -273,8 +544,14 @@ class _WorkRow extends StatelessWidget {
     final palette = context.palette;
     return InkWell(
       onTap: onOpen,
-      child: SizedBox(
-        height: 54,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: BoxConstraints(minHeight: compact ? 66 : 50),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9),
+        decoration: BoxDecoration(
+          color: compact ? palette.surfaceMuted : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
         child: Row(
           children: [
             Expanded(
@@ -284,20 +561,23 @@ class _WorkRow extends StatelessWidget {
                 children: [
                   Text(
                     plan.title,
-                    maxLines: 1,
+                    maxLines: compact ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: TextStyle(
+                      height: 1.15,
+                      fontSize: compact ? 11 : 13,
                       fontWeight: FontWeight.w700,
+                      color: palette.text,
                     ),
                   ),
+                  const SizedBox(height: 3),
                   Text(
                     plan.dueAt == null
-                        ? '$courseName · 未设置截止时间'
+                        ? '$courseName · 未设截止'
                         : '$courseName · ${DateFormat('M月d日').format(plan.dueAt!)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 10, color: palette.textFaint),
+                    style: TextStyle(fontSize: 9, color: palette.textFaint),
                   ),
                 ],
               ),
@@ -306,15 +586,16 @@ class _WorkRow extends StatelessWidget {
               onTap: onToggle,
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                width: 32,
-                height: 32,
+                width: compact ? 27 : 30,
+                height: compact ? 27 : 30,
                 decoration: BoxDecoration(
+                  color: palette.surface,
                   border: Border.all(color: palette.border),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(
                   Icons.check_rounded,
-                  size: 18,
+                  size: 17,
                   color: palette.todayAccent,
                 ),
               ),
@@ -328,91 +609,245 @@ class _WorkRow extends StatelessWidget {
 
 class TodayMaterialsPanel extends StatelessWidget {
   const TodayMaterialsPanel({
+    required this.size,
     required this.materials,
     required this.onOpenCourse,
     required this.onEmptyTap,
-    this.compact = false,
     super.key,
   });
 
+  final TodayTileSize size;
   final List<(Course, List<String>)> materials;
   final ValueChanged<Course> onOpenCourse;
   final VoidCallback onEmptyTap;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
+    final compact = size == TodayTileSize.oneByOne;
     final itemCount = materials.fold<int>(
       0,
       (total, group) => total + group.$2.length,
     );
+    final groupLimit = switch (size) {
+      TodayTileSize.oneByOne => 1,
+      TodayTileSize.twoByOne => 2,
+      TodayTileSize.oneByTwo => 3,
+      TodayTileSize.twoByTwo => 4,
+    };
+    final visible = materials.take(groupLimit).toList();
+    final horizontal = size == TodayTileSize.twoByOne;
+    final grid = size == TodayTileSize.twoByTwo;
+
     return TodayPanel(
-      padding: EdgeInsets.all(compact ? 10 : 12),
+      padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
         children: [
-          TodaySectionHeading(
+          _DashboardPanelHeading(
+            icon: Icons.backpack_outlined,
             eyebrow: '出发检查',
             title: '今天要带什么',
+            compact: compact,
             trailing: materials.isEmpty
-                ? Icon(
-                    Icons.menu_book_outlined,
-                    size: 21,
-                    color: palette.scheduleAccent,
-                  )
-                : _MaterialCountBadge(count: itemCount),
+                ? null
+                : _CountBadge(count: itemCount, unit: '件'),
           ),
-          if (materials.isEmpty)
-            _PanelEmpty(
-              icon: Icons.bookmark_add_outlined,
-              label: '还没有设置携带资料',
-              onTap: onEmptyTap,
-              compact: compact,
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(top: 9),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final twoColumns = constraints.maxWidth >= 300;
-                  final width = twoColumns
-                      ? (constraints.maxWidth - 8) / 2
-                      : constraints.maxWidth;
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 7,
+          SizedBox(height: compact ? 6 : 9),
+          if (size == TodayTileSize.twoByTwo) ...[
+            _MaterialStats(
+              courseCount: materials.length,
+              materialCount: itemCount,
+            ),
+            const SizedBox(height: 8),
+          ],
+          Expanded(
+            child: visible.isEmpty
+                ? _PanelEmpty(
+                    icon: Icons.bookmark_add_outlined,
+                    label: '还没有设置携带资料',
+                    onTap: onEmptyTap,
+                    compact: compact,
+                  )
+                : horizontal
+                ? Row(
                     children: [
-                      for (final group in materials.take(
-                        twoColumns ? (compact ? 2 : 4) : (compact ? 1 : 2),
-                      ))
-                        SizedBox(
-                          width: width,
-                          child: _MaterialCourseRow(
-                            course: group.$1,
-                            names: group.$2,
-                            onTap: () => onOpenCourse(group.$1),
+                      for (var index = 0; index < visible.length; index++) ...[
+                        Expanded(
+                          child: _MaterialCourseCard(
+                            course: visible[index].$1,
+                            names: visible[index].$2,
+                            compact: true,
+                            onTap: () => onOpenCourse(visible[index].$1),
                           ),
                         ),
+                        if (index != visible.length - 1)
+                          const SizedBox(width: 7),
+                      ],
                     ],
-                  );
-                },
-              ),
-            ),
+                  )
+                : grid
+                ? GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 2.25,
+                        ),
+                    itemCount: visible.length,
+                    itemBuilder: (context, index) => _MaterialCourseCard(
+                      course: visible[index].$1,
+                      names: visible[index].$2,
+                      compact: false,
+                      onTap: () => onOpenCourse(visible[index].$1),
+                    ),
+                  )
+                : ListView.separated(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: visible.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 7),
+                    itemBuilder: (context, index) => _MaterialCourseCard(
+                      course: visible[index].$1,
+                      names: visible[index].$2,
+                      compact: compact,
+                      onTap: () => onOpenCourse(visible[index].$1),
+                    ),
+                  ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _MaterialCourseRow extends StatelessWidget {
-  const _MaterialCourseRow({
+class _MaterialStats extends StatelessWidget {
+  const _MaterialStats({
+    required this.courseCount,
+    required this.materialCount,
+  });
+
+  final int courseCount;
+  final int materialCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: palette.scheduleAccentSoft.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.category_outlined,
+            size: 18,
+            color: palette.scheduleAccent,
+          ),
+          const SizedBox(width: 7),
+          _StatMetric(label: '课程', value: '$courseCount'),
+          _StatDivider(color: palette.border),
+          _StatMetric(label: '物品', value: '$materialCount'),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              materialCount == 0 ? '为下一节课补充携带提醒' : '按课程收好，出门前逐项确认',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                height: 1.2,
+                fontSize: 9,
+                color: palette.textSoft,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatMetric extends StatelessWidget {
+  const _StatMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label, style: TextStyle(fontSize: 8, color: palette.textFaint)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: palette.text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 28, color: color);
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 8, color: context.palette.textSoft),
+        ),
+      ],
+    );
+  }
+}
+
+class _MaterialCourseCard extends StatelessWidget {
+  const _MaterialCourseCard({
     required this.course,
     required this.names,
+    required this.compact,
     required this.onTap,
   });
 
   final Course course;
   final List<String> names;
+  final bool compact;
   final VoidCallback onTap;
 
   @override
@@ -422,8 +857,8 @@ class _MaterialCourseRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(7),
       child: Container(
-        height: 68,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        constraints: BoxConstraints(minHeight: compact ? 64 : 60),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9, vertical: 7),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -435,24 +870,23 @@ class _MaterialCourseRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 30,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: palette.surface.withValues(alpha: 0.72),
-                border: Border.all(
-                  color: palette.scheduleAccent.withValues(alpha: 0.14),
+            if (!compact) ...[
+              Container(
+                width: 28,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: palette.surface.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                borderRadius: BorderRadius.circular(6),
+                child: Icon(
+                  Icons.menu_book_rounded,
+                  size: 16,
+                  color: palette.scheduleAccent,
+                ),
               ),
-              child: Icon(
-                Icons.menu_book_rounded,
-                size: 17,
-                color: palette.scheduleAccent,
-              ),
-            ),
-            const SizedBox(width: 9),
+              const SizedBox(width: 8),
+            ],
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -463,57 +897,25 @@ class _MaterialCourseRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: compact ? 10 : 11,
                       fontWeight: FontWeight.w700,
                       color: palette.textSoft,
                     ),
                   ),
                   const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      for (final name in names.take(2))
-                        Flexible(
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: palette.surface.withValues(alpha: 0.76),
-                              border: Border.all(color: palette.border),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: palette.text,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (names.length > 2)
-                        Text(
-                          '+${names.length - 2}',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: palette.scheduleAccent,
-                          ),
-                        ),
-                    ],
+                  Text(
+                    names.take(compact ? 2 : 3).join(' · '),
+                    maxLines: compact ? 2 : 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      height: 1.15,
+                      fontSize: compact ? 10 : 11,
+                      fontWeight: FontWeight.w800,
+                      color: palette.text,
+                    ),
                   ),
                 ],
               ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 17,
-              color: palette.textFaint,
             ),
           ],
         ),
@@ -522,38 +924,80 @@ class _MaterialCourseRow extends StatelessWidget {
   }
 }
 
-class _MaterialCountBadge extends StatelessWidget {
-  const _MaterialCountBadge({required this.count});
+class _DashboardPanelHeading extends StatelessWidget {
+  const _DashboardPanelHeading({
+    required this.icon,
+    required this.eyebrow,
+    required this.title,
+    required this.compact,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String eyebrow;
+  final String title;
+  final bool compact;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    if (!compact) {
+      return TodaySectionHeading(
+        eyebrow: eyebrow,
+        title: title,
+        trailing: trailing,
+      );
+    }
+    return SizedBox(
+      height: 28,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: palette.todayAccent),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: palette.text,
+              ),
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, required this.unit});
 
   final int count;
+  final String unit;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: palette.scheduleAccentSoft,
-        border: Border.all(
-          color: palette.scheduleAccent.withValues(alpha: 0.16),
-        ),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: palette.scheduleAccent,
-            ),
-          ),
-          const SizedBox(width: 3),
-          Text('件', style: TextStyle(fontSize: 9, color: palette.textSoft)),
-        ],
+      child: Text(
+        '$count$unit',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: palette.scheduleAccent,
+        ),
       ),
     );
   }
@@ -575,31 +1019,34 @@ class _PanelEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          width: double.infinity,
-          constraints: BoxConstraints(minHeight: compact ? 72 : 88),
-          padding: EdgeInsets.all(compact ? 8 : 12),
-          decoration: BoxDecoration(
-            color: palette.surfaceMuted,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: compact ? 21 : 24, color: palette.todayAccent),
-              SizedBox(height: compact ? 4 : 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: palette.textSoft),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        padding: EdgeInsets.all(compact ? 7 : 10),
+        decoration: BoxDecoration(
+          color: palette.surfaceMuted,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: compact ? 20 : 24, color: palette.todayAccent),
+            SizedBox(height: compact ? 4 : 6),
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                height: 1.15,
+                fontSize: compact ? 10 : 12,
+                color: palette.textSoft,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

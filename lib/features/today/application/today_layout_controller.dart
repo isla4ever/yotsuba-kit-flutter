@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 
-const _todayLayoutKey = 'today.dashboard.layout.v2';
-const _legacyTodayLayoutKey = 'today.dashboard.layout.v1';
+const _todayLayoutKey = 'today.dashboard.layout.v3';
+const _legacyTodayLayoutKeys = [
+  'today.dashboard.layout.v2',
+  'today.dashboard.layout.v1',
+];
 
 enum TodayTileId { command, timeline, tasks, courseWork, materials }
 
@@ -12,8 +15,7 @@ enum TodayTileSize {
   oneByOne(1, 1, '1x1'),
   oneByTwo(1, 2, '1x2'),
   twoByOne(2, 1, '2x1'),
-  twoByTwo(2, 2, '2x2'),
-  twoByFour(2, 4, '2x4');
+  twoByTwo(2, 2, '2x2');
 
   const TodayTileSize(this.columns, this.rows, this.label);
 
@@ -52,9 +54,11 @@ class TodayTileConfig {
     final id = TodayTileId.values
         .where((item) => item.name == value['id'])
         .firstOrNull;
-    final size = TodayTileSize.values
-        .where((item) => item.name == value['size'])
-        .firstOrNull;
+    final size = value['size'] == 'twoByFour'
+        ? TodayTileSize.twoByTwo
+        : TodayTileSize.values
+              .where((item) => item.name == value['size'])
+              .firstOrNull;
     if (id == null || size == null) return null;
     return TodayTileConfig(
       id: id,
@@ -84,13 +88,14 @@ class TodayLayoutController extends Notifier<List<TodayTileConfig>> {
     final current = _decodeLayout(preferences?.getString(_todayLayoutKey));
     if (current.isNotEmpty) return _completeLayout(current);
 
-    final legacy = _decodeLayout(preferences?.getString(_legacyTodayLayoutKey));
+    var legacy = const <TodayTileConfig>[];
+    for (final key in _legacyTodayLayoutKeys) {
+      legacy = _decodeLayout(preferences?.getString(key));
+      if (legacy.isNotEmpty) break;
+    }
     final migrated = legacy.isEmpty
         ? defaultTodayLayout
-        : _completeLayout([
-            for (final item in legacy)
-              item.copyWith(size: _defaultSizeFor(item.id)),
-          ]);
+        : _completeLayout(legacy);
     preferences?.setString(
       _todayLayoutKey,
       jsonEncode(migrated.map((item) => item.toJson()).toList()),
@@ -121,18 +126,17 @@ class TodayLayoutController extends Notifier<List<TodayTileConfig>> {
     ];
   }
 
-  TodayTileSize _defaultSizeFor(TodayTileId id) =>
-      defaultTodayLayout.firstWhere((item) => item.id == id).size;
-
-  void moveBefore(TodayTileId moving, TodayTileId target) {
-    if (moving == target) return;
-    final next = [...state];
-    final sourceIndex = next.indexWhere((item) => item.id == moving);
-    final targetIndex = next.indexWhere((item) => item.id == target);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-    final item = next.removeAt(sourceIndex);
-    next.insert(next.indexWhere((entry) => entry.id == target), item);
-    _save(next);
+  void moveToVisibleIndex(TodayTileId moving, int visibleIndex) {
+    final visible = state.where((item) => item.visible).toList();
+    final sourceIndex = visible.indexWhere((item) => item.id == moving);
+    if (sourceIndex < 0) return;
+    final item = visible.removeAt(sourceIndex);
+    visible.insert(visibleIndex.clamp(0, visible.length), item);
+    var cursor = 0;
+    _save([
+      for (final entry in state)
+        if (entry.visible) visible[cursor++] else entry,
+    ]);
   }
 
   void setSize(TodayTileId id, TodayTileSize size) {
@@ -140,25 +144,6 @@ class TodayLayoutController extends Notifier<List<TodayTileConfig>> {
       for (final item in state)
         if (item.id == id) item.copyWith(size: size) else item,
     ]);
-  }
-
-  void resizeByDelta(TodayTileId id, OffsetDelta delta) {
-    final item = state.where((entry) => entry.id == id).firstOrNull;
-    if (item == null) return;
-    var columns = item.size.columns;
-    var rows = item.size.rows;
-    if (delta.dx.abs() >= 30) columns = delta.dx > 0 ? 2 : 1;
-    if (delta.dy.abs() >= 30) {
-      if (delta.dy > 0) {
-        rows = rows == 1 ? 2 : 4;
-      } else {
-        rows = rows == 4 ? 2 : 1;
-      }
-    }
-    final size = TodayTileSize.values
-        .where((value) => value.columns == columns && value.rows == rows)
-        .firstOrNull;
-    if (size != null) setSize(id, size);
   }
 
   void setVisible(TodayTileId id, bool visible) {
@@ -179,13 +164,6 @@ class TodayLayoutController extends Notifier<List<TodayTileConfig>> {
           jsonEncode(next.map((item) => item.toJson()).toList()),
         );
   }
-}
-
-class OffsetDelta {
-  const OffsetDelta(this.dx, this.dy);
-
-  final double dx;
-  final double dy;
 }
 
 extension _FirstOrNull<T> on Iterable<T> {
