@@ -115,28 +115,28 @@ List<Color> _sceneColors(WeatherKind kind, AppPalette palette) {
   return switch (kind) {
     WeatherKind.sunny =>
       dark
-          ? const [Color(0xFF172A27), Color(0xFF252119), Color(0xFF101513)]
-          : const [Color(0xFFDDEFE8), Color(0xFFFFF0CC), Color(0xFFF2F5F4)],
+          ? const [Color(0xFF172331), Color(0xFF29251D), Color(0xFF101319)]
+          : const [Color(0xFFDCE9F5), Color(0xFFFFF0CC), Color(0xFFF3F5F8)],
     WeatherKind.cloudy =>
       dark
-          ? const [Color(0xFF1B292C), Color(0xFF17221F), Color(0xFF101513)]
-          : const [Color(0xFFDCE8EA), Color(0xFFE7EEEB), Color(0xFFF2F5F4)],
+          ? const [Color(0xFF1B2631), Color(0xFF181D26), Color(0xFF101319)]
+          : const [Color(0xFFDCE8F0), Color(0xFFE8EBF0), Color(0xFFF3F5F8)],
     WeatherKind.rain || WeatherKind.drizzle =>
       dark
-          ? const [Color(0xFF15242A), Color(0xFF172020), Color(0xFF101513)]
-          : const [Color(0xFFD7E5EA), Color(0xFFE1E9E7), Color(0xFFF2F5F4)],
+          ? const [Color(0xFF142432), Color(0xFF171C25), Color(0xFF101319)]
+          : const [Color(0xFFD7E5EF), Color(0xFFE2E7ED), Color(0xFFF3F5F8)],
     WeatherKind.storm =>
       dark
-          ? const [Color(0xFF1A202A), Color(0xFF131B1B), Color(0xFF101513)]
-          : const [Color(0xFFD5DDE7), Color(0xFFE3E8E6), Color(0xFFF2F5F4)],
+          ? const [Color(0xFF1B2030), Color(0xFF141822), Color(0xFF101319)]
+          : const [Color(0xFFD5DDEB), Color(0xFFE3E6EC), Color(0xFFF3F5F8)],
     WeatherKind.snow =>
       dark
-          ? const [Color(0xFF233033), Color(0xFF18211F), Color(0xFF101513)]
-          : const [Color(0xFFE6F0F2), Color(0xFFF0F3F1), Color(0xFFF2F5F4)],
+          ? const [Color(0xFF22303A), Color(0xFF191E27), Color(0xFF101319)]
+          : const [Color(0xFFE5EFF5), Color(0xFFF0F2F5), Color(0xFFF3F5F8)],
     _ =>
       dark
-          ? const [Color(0xFF17211F), Color(0xFF101513)]
-          : const [Color(0xFFE5ECE9), Color(0xFFF2F5F4)],
+          ? const [Color(0xFF171D27), Color(0xFF101319)]
+          : const [Color(0xFFE7EBF1), Color(0xFFF3F5F8)],
   };
 }
 

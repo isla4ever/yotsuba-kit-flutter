@@ -11,22 +11,32 @@ import 'package:yotsuba_schedule/features/schedule/presentation/planning/course_
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/course_materials_sheet.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/day_planner_sheet.dart';
 import 'package:yotsuba_schedule/features/today/application/today_view_model.dart';
+import 'package:yotsuba_schedule/features/today/application/today_layout_controller.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_command_summary.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_course_timeline.dart';
+import 'package:yotsuba_schedule/features/today/presentation/widgets/today_dashboard_grid.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_readiness_board.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_glyph.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
 
-class TodayScreen extends ConsumerWidget {
+class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends ConsumerState<TodayScreen> {
+  bool _editingLayout = false;
+
+  @override
+  Widget build(BuildContext context) {
     final viewModel = ref.watch(todayViewModelProvider);
     final schedule = ref.watch(scheduleControllerProvider);
     final settings = ref.watch(appSettingsProvider);
     final weather = ref.watch(weatherControllerProvider);
+    final layout = ref.watch(todayLayoutProvider);
     final controller = ref.read(scheduleControllerProvider.notifier);
     final dateLabel = DateFormat('M月d日 · EEEE', 'zh_CN').format(viewModel.now);
     final greeting = switch (viewModel.now.hour) {
@@ -47,7 +57,6 @@ class TodayScreen extends ConsumerWidget {
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 700;
             return SingleChildScrollView(
               key: const PageStorageKey('today-scroll'),
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
@@ -61,80 +70,116 @@ class TodayScreen extends ConsumerWidget {
                         dateLabel: dateLabel,
                         weather: weather,
                         reduceMotion: settings.reduceMotion,
-                        onWeatherTap: () => ref
-                            .read(weatherControllerProvider.notifier)
-                            .requestLocation(),
+                        onWeatherTap: _requestWeather,
                       ),
-                      const SizedBox(height: 12),
-                      if (wide)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 108,
-                              child: TodayCommandSummary(
-                                viewModel: viewModel,
-                                weatherHint: _weatherHint(
-                                  weather,
-                                  viewModel.now,
-                                ),
+                      AnimatedSwitcher(
+                        duration: settings.reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 280),
+                        child: _editingLayout
+                            ? _TodayLayoutToolbar(
+                                key: const ValueKey('layout-toolbar'),
+                                onDone: () =>
+                                    setState(() => _editingLayout = false),
+                                onManage: _showWidgetManager,
+                                onReset: () => ref
+                                    .read(todayLayoutProvider.notifier)
+                                    .reset(),
+                              )
+                            : const SizedBox.shrink(
+                                key: ValueKey('layout-toolbar-empty'),
                               ),
+                      ),
+                      SizedBox(height: _editingLayout ? 12 : 6),
+                      TodayDashboardGrid(
+                        layout: layout,
+                        editing: _editingLayout,
+                        reduceMotion: settings.reduceMotion,
+                        onRequestEdit: () =>
+                            setState(() => _editingLayout = true),
+                        onMove: (moving, target) => ref
+                            .read(todayLayoutProvider.notifier)
+                            .moveBefore(moving, target),
+                        onResize: (id, delta) => ref
+                            .read(todayLayoutProvider.notifier)
+                            .resizeByDelta(id, delta),
+                        onHide: (id) => ref
+                            .read(todayLayoutProvider.notifier)
+                            .setVisible(id, false),
+                        children: {
+                          TodayTileId.command: TodayCommandSummary(
+                            viewModel: viewModel,
+                            weatherHint: _weatherHint(weather, viewModel.now),
+                          ),
+                          TodayTileId.timeline: TodayCourseTimeline(
+                            courses: viewModel.courses,
+                            onOpenSchedule: () => context.go('/schedule'),
+                          ),
+                          TodayTileId.tasks: TodayTaskPanel(
+                            tasks: viewModel.dayTasks,
+                            compact:
+                                layout
+                                    .where(
+                                      (item) => item.id == TodayTileId.tasks,
+                                    )
+                                    .firstOrNull
+                                    ?.size
+                                    .rows ==
+                                1,
+                            onAdd: () => showDayPlannerSheet(
+                              context,
+                              date: viewModel.now,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 92,
-                              child: TodayCourseTimeline(
-                                courses: viewModel.courses,
-                                onOpenSchedule: () => context.go('/schedule'),
-                              ),
+                            onToggle: controller.toggleDayTask,
+                          ),
+                          TodayTileId.courseWork: TodayCourseWorkPanel(
+                            plans: viewModel.coursePlans,
+                            courses: schedule.courses,
+                            compact:
+                                layout
+                                    .where(
+                                      (item) =>
+                                          item.id == TodayTileId.courseWork,
+                                    )
+                                    .firstOrNull
+                                    ?.size
+                                    .rows ==
+                                1,
+                            onToggle: (plan) async {
+                              if (!plan.completed &&
+                                  !await confirmCoursePlanCompletion(
+                                    context,
+                                    plan,
+                                  )) {
+                                return;
+                              }
+                              controller.setCoursePlanCompleted(
+                                plan.id,
+                                !plan.completed,
+                              );
+                            },
+                            onOpen: (plan) {
+                              final course = schedule.courses
+                                  .where((item) => item.id == plan.courseId)
+                                  .firstOrNull;
+                              if (course != null) {
+                                showCoursePlanSheet(context, course: course);
+                              }
+                            },
+                          ),
+                          TodayTileId.materials: TodayMaterialsPanel(
+                            materials: [
+                              for (final item in viewModel.courses)
+                                if (item.course.materials.isNotEmpty)
+                                  (item.course, item.course.materials),
+                            ],
+                            onOpenCourse: (course) => showCourseMaterialsSheet(
+                              context,
+                              course: course,
                             ),
-                          ],
-                        )
-                      else ...[
-                        TodayCommandSummary(
-                          viewModel: viewModel,
-                          weatherHint: _weatherHint(weather, viewModel.now),
-                        ),
-                        const SizedBox(height: 16),
-                        TodayCourseTimeline(
-                          courses: viewModel.courses,
-                          onOpenSchedule: () => context.go('/schedule'),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      TodayReadinessBoard(
-                        dayTasks: viewModel.dayTasks,
-                        coursePlans: viewModel.coursePlans,
-                        courses: schedule.courses,
-                        todayCourses: viewModel.courses,
-                        wide: wide,
-                        onAddTask: () =>
-                            showDayPlannerSheet(context, date: viewModel.now),
-                        onToggleTask: controller.toggleDayTask,
-                        onTogglePlan: (plan) async {
-                          if (!plan.completed &&
-                              !await confirmCoursePlanCompletion(
-                                context,
-                                plan,
-                              )) {
-                            return;
-                          }
-                          controller.setCoursePlanCompleted(
-                            plan.id,
-                            !plan.completed,
-                          );
+                            onEmptyTap: () => context.go('/schedule'),
+                          ),
                         },
-                        onOpenPlan: (plan) {
-                          final course = schedule.courses
-                              .where((item) => item.id == plan.courseId)
-                              .firstOrNull;
-                          if (course != null) {
-                            showCoursePlanSheet(context, course: course);
-                          }
-                        },
-                        onOpenMaterials: (course) =>
-                            showCourseMaterialsSheet(context, course: course),
-                        onOpenSchedule: () => context.go('/schedule'),
                       ),
                     ],
                   ),
@@ -143,6 +188,175 @@ class TodayScreen extends ConsumerWidget {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Future<void> _requestWeather() async {
+    final controller = ref.read(weatherControllerProvider.notifier);
+    final status = await controller.requestLocation();
+    if (!mounted || status == WeatherStatus.ready) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) {
+        final state = ref.read(weatherControllerProvider);
+        final palette = context.palette;
+        final canOpenSettings = {
+          WeatherStatus.deniedForever,
+          WeatherStatus.serviceDisabled,
+        }.contains(state.status);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.location_off_outlined,
+                  color: palette.scheduleAccent,
+                  size: 26,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '暂时无法使用当前位置',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(state.message, style: TextStyle(color: palette.textSoft)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await controller.useCampusWeather();
+                        },
+                        child: const Text('使用学校天气'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          if (canOpenSettings &&
+                              await controller.openPermissionSettings()) {
+                            return;
+                          }
+                          await controller.requestLocation();
+                        },
+                        child: Text(canOpenSettings ? '开启定位' : '重新尝试'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showWidgetManager() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final layout = ref.watch(todayLayoutProvider);
+          return SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('管理今日组件', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 6),
+                  Text(
+                    '显示需要的信息，回到看板后可拖动排序和右下角调整尺寸。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.palette.textSoft,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final item in layout)
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(_tileLabel(item.id)),
+                      subtitle: Text('当前尺寸 ${item.size.label}'),
+                      value: item.visible,
+                      onChanged: (value) => ref
+                          .read(todayLayoutProvider.notifier)
+                          .setVisible(item.id, value),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TodayLayoutToolbar extends StatelessWidget {
+  const _TodayLayoutToolbar({
+    required this.onDone,
+    required this.onManage,
+    required this.onReset,
+    super.key,
+  });
+
+  final VoidCallback onDone;
+  final VoidCallback onManage;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: palette.surface.withValues(alpha: 0.94),
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.dashboard_customize_outlined,
+            color: palette.scheduleAccent,
+          ),
+          const SizedBox(width: 7),
+          const Expanded(
+            child: Text(
+              '布局',
+              maxLines: 1,
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          IconButton(
+            tooltip: '管理组件',
+            onPressed: onManage,
+            icon: const Icon(Icons.widgets_outlined, size: 19),
+          ),
+          IconButton(
+            tooltip: '恢复默认布局',
+            onPressed: onReset,
+            icon: const Icon(Icons.restart_alt_rounded, size: 19),
+          ),
+          FilledButton.tonal(onPressed: onDone, child: const Text('完成')),
+        ],
       ),
     );
   }
@@ -299,7 +513,14 @@ class _WeatherChip extends StatelessWidget {
                       )
                     else
                       Text(
-                        '天气',
+                        switch (weather.status) {
+                          WeatherStatus.denied ||
+                          WeatherStatus.deniedForever => '需定位',
+                          WeatherStatus.serviceDisabled => '开定位',
+                          WeatherStatus.error ||
+                          WeatherStatus.unavailable => '重试',
+                          _ => '天气',
+                        },
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -313,6 +534,14 @@ class _WeatherChip extends StatelessWidget {
     );
   }
 }
+
+String _tileLabel(TodayTileId id) => switch (id) {
+  TodayTileId.command => '课程概览',
+  TodayTileId.timeline => '课程时间轴',
+  TodayTileId.tasks => '当天待办',
+  TodayTileId.courseWork => '课程作业',
+  TodayTileId.materials => '携带物品',
+};
 
 extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;

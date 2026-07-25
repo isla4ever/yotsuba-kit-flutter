@@ -33,7 +33,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   late final PageController _weekController;
   bool _editing = false;
   bool _toolMenuOpen = false;
-  late int _settledWeek;
   final _screenGuideKey = GlobalKey();
   final _weekGuideKey = GlobalKey();
   final _courseGuideKey = GlobalKey();
@@ -47,7 +46,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   void initState() {
     super.initState();
     final week = ref.read(scheduleControllerProvider).currentWeek;
-    _settledWeek = week;
     _weekController = PageController(initialPage: week - 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -132,7 +130,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                         physics: const BouncingScrollPhysics(
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
-                        onPageChanged: (index) => controller.setWeek(index + 1),
                         itemBuilder: (context, index) {
                           final week = index + 1;
                           return WeekTimetable(
@@ -148,7 +145,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                                 ? summerCourseTimes
                                 : standardCourseTimes,
                             editing: _editing,
-                            active: _settledWeek == week,
+                            pageController: _weekController,
                             reduceMotion: settings.reduceMotion,
                             onCourseTap: (course) => _showCourse(course, week),
                             onDayTap: (weekday) => showDayPlannerSheet(
@@ -353,6 +350,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       WeatherStatus.idle => '点击顶部天气按钮后查看课程当日预报',
       WeatherStatus.loading => '正在匹配当前位置天气',
       WeatherStatus.denied => '定位权限未开启，暂时无法匹配天气',
+      WeatherStatus.deniedForever => '请在系统或浏览器设置中允许定位',
+      WeatherStatus.serviceDisabled => '系统定位服务尚未开启',
       WeatherStatus.unavailable => '当前设备不支持定位天气',
       WeatherStatus.error => '天气暂时不可用，点击顶部天气按钮可重试',
       WeatherStatus.ready => '该日期尚未进入未来预报范围',
@@ -436,7 +435,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         curve: Curves.easeOutCubic,
       );
     } else {
-      setState(() => _settledWeek = 0);
       _weekController.jumpToPage(selected - 1);
     }
     if (mounted) _settleWeek(selected, controller);
@@ -455,8 +453,5 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   void _settleWeek(int week, ScheduleController controller) {
     controller.setWeek(week);
-    if (_settledWeek != week && mounted) {
-      setState(() => _settledWeek = week);
-    }
   }
 }

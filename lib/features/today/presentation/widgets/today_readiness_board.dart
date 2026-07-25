@@ -42,18 +42,18 @@ class TodayReadinessBoard extends StatelessWidget {
         if (item.course.materials.isNotEmpty)
           (item.course, item.course.materials),
     ];
-    final taskPanel = _TaskPanel(
+    final taskPanel = TodayTaskPanel(
       tasks: dayTasks,
       onAdd: onAddTask,
       onToggle: onToggleTask,
     );
-    final workPanel = _CourseWorkPanel(
+    final workPanel = TodayCourseWorkPanel(
       plans: coursePlans,
       courses: courses,
       onToggle: onTogglePlan,
       onOpen: onOpenPlan,
     );
-    final materialPanel = _MaterialsPanel(
+    final materialPanel = TodayMaterialsPanel(
       materials: materials,
       onOpenCourse: onOpenMaterials,
       onEmptyTap: onOpenSchedule,
@@ -84,20 +84,24 @@ class TodayReadinessBoard extends StatelessWidget {
   }
 }
 
-class _TaskPanel extends StatelessWidget {
-  const _TaskPanel({
+class TodayTaskPanel extends StatelessWidget {
+  const TodayTaskPanel({
     required this.tasks,
     required this.onAdd,
     required this.onToggle,
+    this.compact = false,
+    super.key,
   });
 
   final List<DayTask> tasks;
   final VoidCallback onAdd;
   final ValueChanged<String> onToggle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return TodayPanel(
+      padding: EdgeInsets.all(compact ? 12 : 16),
       child: Column(
         children: [
           TodaySectionHeading(
@@ -116,13 +120,14 @@ class _TaskPanel extends StatelessWidget {
               icon: Icons.task_alt_rounded,
               label: '今天还没有待办',
               onTap: onAdd,
+              compact: compact,
             )
           else
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Column(
                 children: [
-                  for (final task in tasks.take(3))
+                  for (final task in tasks.take(compact ? 1 : 3))
                     _TaskRow(task: task, onTap: () => onToggle(task.id)),
                 ],
               ),
@@ -191,23 +196,30 @@ class _TaskRow extends StatelessWidget {
   }
 }
 
-class _CourseWorkPanel extends StatelessWidget {
-  const _CourseWorkPanel({
+class TodayCourseWorkPanel extends StatelessWidget {
+  const TodayCourseWorkPanel({
     required this.plans,
     required this.courses,
     required this.onToggle,
     required this.onOpen,
+    this.compact = false,
+    super.key,
   });
 
   final List<CoursePlan> plans;
   final List<Course> courses;
   final ValueChanged<CoursePlan> onToggle;
   final ValueChanged<CoursePlan> onOpen;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final pending = plans.where((plan) => !plan.completed).take(3).toList();
+    final pending = plans
+        .where((plan) => !plan.completed)
+        .take(compact ? 1 : 3)
+        .toList();
     return TodayPanel(
+      padding: EdgeInsets.all(compact ? 12 : 16),
       child: Column(
         children: [
           const TodaySectionHeading(eyebrow: '课程作业', title: '临近截止'),
@@ -215,6 +227,7 @@ class _CourseWorkPanel extends StatelessWidget {
             const _PanelEmpty(
               icon: Icons.library_books_outlined,
               label: '暂无待完成作业',
+              compact: true,
             )
           else
             Padding(
@@ -313,11 +326,12 @@ class _WorkRow extends StatelessWidget {
   }
 }
 
-class _MaterialsPanel extends StatelessWidget {
-  const _MaterialsPanel({
+class TodayMaterialsPanel extends StatelessWidget {
+  const TodayMaterialsPanel({
     required this.materials,
     required this.onOpenCourse,
     required this.onEmptyTap,
+    super.key,
   });
 
   final List<(Course, List<String>)> materials;
@@ -347,58 +361,29 @@ class _MaterialsPanel extends StatelessWidget {
             )
           else
             Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final group in materials.take(4))
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 148,
-                        maxWidth: 220,
-                      ),
-                      child: InkWell(
-                        onTap: () => onOpenCourse(group.$1),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          height: 54,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: palette.surfaceMuted,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                group.$1.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: palette.textFaint,
-                                ),
-                              ),
-                              Text(
-                                group.$2.join('、'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: palette.text,
-                                ),
-                              ),
-                            ],
+              padding: const EdgeInsets.only(top: 9),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final twoColumns = constraints.maxWidth >= 430;
+                  final width = twoColumns
+                      ? (constraints.maxWidth - 8) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 7,
+                    children: [
+                      for (final group in materials.take(twoColumns ? 4 : 2))
+                        SizedBox(
+                          width: width,
+                          child: _MaterialCourseRow(
+                            course: group.$1,
+                            names: group.$2,
+                            onTap: () => onOpenCourse(group.$1),
                           ),
                         ),
-                      ),
-                    ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
         ],
@@ -407,12 +392,96 @@ class _MaterialsPanel extends StatelessWidget {
   }
 }
 
+class _MaterialCourseRow extends StatelessWidget {
+  const _MaterialCourseRow({
+    required this.course,
+    required this.names,
+    required this.onTap,
+  });
+
+  final Course course;
+  final List<String> names;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(7),
+      child: Container(
+        height: 50,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        decoration: BoxDecoration(
+          color: palette.surfaceMuted,
+          border: Border.all(color: palette.border.withValues(alpha: 0.72)),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: palette.scheduleAccentSoft,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                Icons.menu_book_rounded,
+                size: 17,
+                color: palette.scheduleAccent,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    course.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, color: palette.textFaint),
+                  ),
+                  Text(
+                    names.join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: palette.text,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 17,
+              color: palette.textFaint,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PanelEmpty extends StatelessWidget {
-  const _PanelEmpty({required this.icon, required this.label, this.onTap});
+  const _PanelEmpty({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.compact = false,
+  });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -424,8 +493,8 @@ class _PanelEmpty extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 88),
-          padding: const EdgeInsets.all(12),
+          constraints: BoxConstraints(minHeight: compact ? 72 : 88),
+          padding: EdgeInsets.all(compact ? 8 : 12),
           decoration: BoxDecoration(
             color: palette.surfaceMuted,
             borderRadius: BorderRadius.circular(6),
@@ -433,8 +502,8 @@ class _PanelEmpty extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 24, color: palette.todayAccent),
-              const SizedBox(height: 6),
+              Icon(icon, size: compact ? 21 : 24, color: palette.todayAccent),
+              SizedBox(height: compact ? 4 : 6),
               Text(
                 label,
                 textAlign: TextAlign.center,

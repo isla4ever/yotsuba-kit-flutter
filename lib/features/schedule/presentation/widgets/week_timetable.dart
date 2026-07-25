@@ -20,7 +20,7 @@ class WeekTimetable extends StatefulWidget {
     required this.dayOverrides,
     required this.weather,
     required this.editing,
-    required this.active,
+    required this.pageController,
     required this.reduceMotion,
     required this.onCourseTap,
     required this.onEmptyCellTap,
@@ -39,7 +39,7 @@ class WeekTimetable extends StatefulWidget {
   final List<AcademicDayOverride> dayOverrides;
   final WeatherSnapshot? weather;
   final bool editing;
-  final bool active;
+  final PageController pageController;
   final bool reduceMotion;
   final ValueChanged<Course> onCourseTap;
   final void Function(int weekday, int startSection, int endSection)
@@ -57,9 +57,8 @@ class WeekTimetable extends StatefulWidget {
   State<WeekTimetable> createState() => _WeekTimetableState();
 }
 
-class _WeekTimetableState extends State<WeekTimetable>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _courseWave;
+class _WeekTimetableState extends State<WeekTimetable> {
+  late _PageRevealAnimation _courseWave;
   int? _selectionDay;
   int? _selectionAnchor;
   int? _selectionEnd;
@@ -67,46 +66,30 @@ class _WeekTimetableState extends State<WeekTimetable>
   @override
   void initState() {
     super.initState();
-    _courseWave = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 560),
-      value: widget.reduceMotion ? 1 : 0,
+    _courseWave = _PageRevealAnimation(
+      controller: widget.pageController,
+      pageIndex: widget.week - 1,
+      reduceMotion: widget.reduceMotion,
     );
-    if (widget.active && !widget.reduceMotion) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _courseWave.forward(from: 0);
-        }
-      });
-    }
   }
 
   @override
   void didUpdateWidget(covariant WeekTimetable oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.reduceMotion) {
-      _courseWave.value = 1;
-      return;
-    }
-    if (widget.active && (!oldWidget.active || oldWidget.week != widget.week)) {
-      _courseWave.value = 0;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.active) _courseWave.forward();
-      });
-    } else if (!widget.active && oldWidget.active) {
-      _courseWave.value = 0;
+    if (oldWidget.pageController != widget.pageController ||
+        oldWidget.week != widget.week ||
+        oldWidget.reduceMotion != widget.reduceMotion) {
+      _courseWave = _PageRevealAnimation(
+        controller: widget.pageController,
+        pageIndex: widget.week - 1,
+        reduceMotion: widget.reduceMotion,
+      );
     }
     if (!widget.editing && oldWidget.editing) {
       _selectionDay = null;
       _selectionAnchor = null;
       _selectionEnd = null;
     }
-  }
-
-  @override
-  void dispose() {
-    _courseWave.dispose();
-    super.dispose();
   }
 
   @override
@@ -309,7 +292,7 @@ class _WeekHeader extends StatelessWidget {
     return Container(
       height: WeekTimetable.headerHeight,
       decoration: BoxDecoration(
-        color: editing ? palette.surface : palette.canvas,
+        color: editing ? palette.surface : Colors.transparent,
         border: Border(bottom: BorderSide(color: palette.border)),
       ),
       child: Row(
@@ -539,18 +522,8 @@ class _GridBody extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: editing
               ? LinearGradient(colors: [palette.surface, palette.surface])
-              : LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0, 0.42],
-                  colors: [
-                    Color.lerp(
-                      palette.surfaceRaised,
-                      palette.scheduleAccentSoft,
-                      0.09,
-                    )!,
-                    palette.canvas,
-                  ],
+              : const LinearGradient(
+                  colors: [Colors.transparent, Colors.transparent],
                 ),
         ),
         child: Stack(
@@ -838,13 +811,13 @@ class _WaveCourseReveal extends StatelessWidget {
           0.0,
           1.0,
         );
-        final value = Curves.easeOutCubic.transform(normalized);
+        final value = Curves.easeInOutCubic.transform(normalized);
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, (1 - value) * 8),
+            offset: Offset(0, (1 - value) * 6),
             child: Transform.scale(
-              scale: 0.992 + value * 0.008,
+              scale: 0.996 + value * 0.004,
               alignment: Alignment.topCenter,
               child: child,
             ),
@@ -852,6 +825,48 @@ class _WaveCourseReveal extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _PageRevealAnimation extends Animation<double> {
+  _PageRevealAnimation({
+    required this.controller,
+    required this.pageIndex,
+    required this.reduceMotion,
+  });
+
+  final PageController controller;
+  final int pageIndex;
+  final bool reduceMotion;
+
+  @override
+  void addListener(VoidCallback listener) => controller.addListener(listener);
+
+  @override
+  void removeListener(VoidCallback listener) =>
+      controller.removeListener(listener);
+
+  @override
+  void addStatusListener(AnimationStatusListener listener) {}
+
+  @override
+  void removeStatusListener(AnimationStatusListener listener) {}
+
+  @override
+  AnimationStatus get status => value >= 1
+      ? AnimationStatus.completed
+      : value <= 0
+      ? AnimationStatus.dismissed
+      : AnimationStatus.forward;
+
+  @override
+  double get value {
+    if (reduceMotion) return 1;
+    final page = controller.hasClients
+        ? controller.page ?? controller.initialPage.toDouble()
+        : controller.initialPage.toDouble();
+    final proximity = (1 - (page - pageIndex).abs()).clamp(0.0, 1.0);
+    return ((proximity - 0.04) / 0.84).clamp(0.0, 1.0);
   }
 }
 
