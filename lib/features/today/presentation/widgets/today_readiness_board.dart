@@ -74,17 +74,10 @@ class TodayReadinessBoard extends StatelessWidget {
 
     return Column(
       children: [
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: taskPanel),
-              const SizedBox(width: 10),
-              Expanded(child: workPanel),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
+        taskPanel,
+        const SizedBox(height: 12),
+        workPanel,
+        const SizedBox(height: 12),
         materialPanel,
       ],
     );
@@ -114,8 +107,8 @@ class _TaskPanel extends StatelessWidget {
               tooltip: '添加当天待办',
               onPressed: onAdd,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-              icon: const Icon(Icons.add_rounded, size: 17),
+              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              icon: const Icon(Icons.add_rounded, size: 21),
             ),
           ),
           if (tasks.isEmpty)
@@ -126,7 +119,7 @@ class _TaskPanel extends StatelessWidget {
             )
           else
             Padding(
-              padding: const EdgeInsets.only(top: 7),
+              padding: const EdgeInsets.only(top: 10),
               child: Column(
                 children: [
                   for (final task in tasks.take(3))
@@ -152,13 +145,13 @@ class _TaskRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: SizedBox(
-        height: 32,
+        height: 44,
         child: Row(
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              width: 18,
-              height: 18,
+              width: 22,
+              height: 22,
               decoration: BoxDecoration(
                 color: task.completed
                     ? palette.todayAccent
@@ -171,19 +164,19 @@ class _TaskRow extends StatelessWidget {
               child: task.completed
                   ? const Icon(
                       Icons.check_rounded,
-                      size: 14,
+                      size: 16,
                       color: Colors.white,
                     )
                   : null,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 9),
             Expanded(
               child: Text(
                 task.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 13,
                   color: task.completed ? palette.textFaint : palette.text,
                   decoration: task.completed
                       ? TextDecoration.lineThrough
@@ -225,7 +218,7 @@ class _CourseWorkPanel extends StatelessWidget {
             )
           else
             Padding(
-              padding: const EdgeInsets.only(top: 7),
+              padding: const EdgeInsets.only(top: 10),
               child: Column(
                 children: [
                   for (final plan in pending)
@@ -268,7 +261,7 @@ class _WorkRow extends StatelessWidget {
     return InkWell(
       onTap: onOpen,
       child: SizedBox(
-        height: 40,
+        height: 54,
         child: Row(
           children: [
             Expanded(
@@ -281,7 +274,7 @@ class _WorkRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -291,7 +284,7 @@ class _WorkRow extends StatelessWidget {
                         : '$courseName · ${DateFormat('M月d日').format(plan.dueAt!)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 8, color: palette.textFaint),
+                    style: TextStyle(fontSize: 10, color: palette.textFaint),
                   ),
                 ],
               ),
@@ -300,15 +293,15 @@ class _WorkRow extends StatelessWidget {
               onTap: onToggle,
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                width: 25,
-                height: 25,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   border: Border.all(color: palette.border),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(
                   Icons.check_rounded,
-                  size: 15,
+                  size: 18,
                   color: palette.todayAccent,
                 ),
               ),
@@ -342,7 +335,7 @@ class _MaterialsPanel extends StatelessWidget {
             title: '今天要带什么',
             trailing: Icon(
               Icons.menu_book_outlined,
-              size: 18,
+              size: 21,
               color: palette.todayAccent,
             ),
           ),
@@ -354,19 +347,22 @@ class _MaterialsPanel extends StatelessWidget {
             )
           else
             Padding(
-              padding: const EdgeInsets.only(top: 7),
+              padding: const EdgeInsets.only(top: 10),
               child: Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
                   for (final group in materials.take(4))
-                    SizedBox(
-                      width: 158,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 148,
+                        maxWidth: 220,
+                      ),
                       child: InkWell(
                         onTap: () => onOpenCourse(group.$1),
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          height: 42,
+                          height: 54,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 5,
@@ -383,7 +379,7 @@ class _MaterialsPanel extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 8,
+                                  fontSize: 10,
                                   color: palette.textFaint,
                                 ),
                               ),
@@ -392,7 +388,7 @@ class _MaterialsPanel extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: palette.text,
                                 ),
@@ -422,14 +418,14 @@ class _PanelEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Padding(
-      padding: const EdgeInsets.only(top: 7),
+      padding: const EdgeInsets.only(top: 10),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 72),
-          padding: const EdgeInsets.all(8),
+          constraints: const BoxConstraints(minHeight: 88),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: palette.surfaceMuted,
             borderRadius: BorderRadius.circular(6),
@@ -437,12 +433,12 @@ class _PanelEmpty extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: palette.todayAccent),
-              const SizedBox(height: 4),
+              Icon(icon, size: 24, color: palette.todayAccent),
+              const SizedBox(height: 6),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 9, color: palette.textSoft),
+                style: TextStyle(fontSize: 12, color: palette.textSoft),
               ),
             ],
           ),

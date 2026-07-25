@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
+import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 
@@ -10,6 +11,8 @@ class CoursePlanForm extends StatefulWidget {
     required this.course,
     required this.termStart,
     required this.totalWeeks,
+    required this.courseTimes,
+    required this.dayOverrides,
     required this.onCancel,
     required this.onSave,
     this.initial,
@@ -20,6 +23,8 @@ class CoursePlanForm extends StatefulWidget {
   final CoursePlan? initial;
   final DateTime termStart;
   final int totalWeeks;
+  final List<CourseTime> courseTimes;
+  final List<AcademicDayOverride> dayOverrides;
   final VoidCallback onCancel;
   final ValueChanged<CoursePlan> onSave;
 
@@ -381,17 +386,30 @@ class _CoursePlanFormState extends State<CoursePlanForm> {
       week++
     ) {
       if (!widget.course.occursInWeek(week)) continue;
-      final date = ScheduleEngine.dateForWeekday(
-        widget.termStart,
-        week,
-        widget.course.weekday,
-      );
-      final parts = courseTimes[widget.course.startSection - 1].start
-          .split(':')
-          .map(int.parse)
-          .toList();
-      final due = DateTime(date.year, date.month, date.day, parts[0], parts[1]);
-      if (due.isAfter(now)) result.add((week, due));
+      for (var day = 1; day <= 7; day++) {
+        final date = ScheduleEngine.dateForWeekday(widget.termStart, week, day);
+        final dateKey = ScheduleEngine.dateKey(date);
+        final dayOverride = widget.dayOverrides
+            .where((item) => item.dateKey == dateKey)
+            .firstOrNull;
+        if (dayOverride?.kind == AcademicDayKind.holiday) continue;
+        final sourceWeekday = dayOverride?.kind == AcademicDayKind.makeUp
+            ? dayOverride?.sourceWeekday ?? day
+            : day;
+        if (sourceWeekday != widget.course.weekday) continue;
+        final parts = widget.courseTimes[widget.course.startSection - 1].start
+            .split(':')
+            .map(int.parse)
+            .toList();
+        final due = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          parts[0],
+          parts[1],
+        );
+        if (due.isAfter(now)) result.add((week, due));
+      }
     }
     return result.take(28).toList();
   }

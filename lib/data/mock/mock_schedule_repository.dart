@@ -166,6 +166,7 @@ class MockScheduleRepository {
           ],
         ),
       ],
+      dayOverrides: const [],
     );
   }
 }

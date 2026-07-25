@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
@@ -36,6 +37,7 @@ class _CoursePlanSheetState extends ConsumerState<_CoursePlanSheet> {
   @override
   Widget build(BuildContext context) {
     final schedule = ref.watch(scheduleControllerProvider);
+    final settings = ref.watch(appSettingsProvider);
     final course = schedule.courses
         .where((item) => item.id == widget.courseId)
         .firstOrNull;
@@ -77,6 +79,10 @@ class _CoursePlanSheetState extends ConsumerState<_CoursePlanSheet> {
                   initial: _editing,
                   termStart: schedule.termStart,
                   totalWeeks: schedule.totalWeeks,
+                  courseTimes: settings.summerSchedule
+                      ? summerCourseTimes
+                      : standardCourseTimes,
+                  dayOverrides: schedule.dayOverrides,
                   onCancel: () => setState(() {
                     _showForm = false;
                     _editing = null;

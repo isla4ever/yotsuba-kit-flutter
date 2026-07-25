@@ -6,6 +6,8 @@ const _themeKey = 'settings.theme';
 const _reduceMotionKey = 'settings.reduceMotion';
 const _compactScheduleKey = 'settings.compactSchedule';
 const _showWeekendKey = 'settings.showWeekend';
+const _summerScheduleKey = 'settings.summerSchedule';
+const _scheduleRowHeightKey = 'settings.scheduleRowHeight';
 
 final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) => null);
 
@@ -16,24 +18,32 @@ class AppSettings {
     this.reduceMotion = false,
     this.compactSchedule = false,
     this.showWeekend = true,
+    this.summerSchedule = false,
+    this.scheduleRowHeight = 62,
   });
 
   final ThemeMode themeMode;
   final bool reduceMotion;
   final bool compactSchedule;
   final bool showWeekend;
+  final bool summerSchedule;
+  final double scheduleRowHeight;
 
   AppSettings copyWith({
     ThemeMode? themeMode,
     bool? reduceMotion,
     bool? compactSchedule,
     bool? showWeekend,
+    bool? summerSchedule,
+    double? scheduleRowHeight,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
       reduceMotion: reduceMotion ?? this.reduceMotion,
       compactSchedule: compactSchedule ?? this.compactSchedule,
       showWeekend: showWeekend ?? this.showWeekend,
+      summerSchedule: summerSchedule ?? this.summerSchedule,
+      scheduleRowHeight: scheduleRowHeight ?? this.scheduleRowHeight,
     );
   }
 }
@@ -59,6 +69,8 @@ class AppSettingsController extends Notifier<AppSettings> {
       reduceMotion: preferences?.getBool(_reduceMotionKey) ?? false,
       compactSchedule: preferences?.getBool(_compactScheduleKey) ?? false,
       showWeekend: preferences?.getBool(_showWeekendKey) ?? true,
+      summerSchedule: preferences?.getBool(_summerScheduleKey) ?? false,
+      scheduleRowHeight: preferences?.getDouble(_scheduleRowHeightKey) ?? 62,
     );
   }
 
@@ -80,5 +92,16 @@ class AppSettingsController extends Notifier<AppSettings> {
   void setShowWeekend(bool value) {
     state = state.copyWith(showWeekend: value);
     _preferences?.setBool(_showWeekendKey, value);
+  }
+
+  void setSummerSchedule(bool value) {
+    state = state.copyWith(summerSchedule: value);
+    _preferences?.setBool(_summerScheduleKey, value);
+  }
+
+  void setScheduleRowHeight(double value) {
+    final normalized = value.clamp(54, 78).roundToDouble();
+    state = state.copyWith(scheduleRowHeight: normalized);
+    _preferences?.setDouble(_scheduleRowHeightKey, normalized);
   }
 }

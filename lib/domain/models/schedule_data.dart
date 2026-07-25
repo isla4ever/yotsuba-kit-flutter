@@ -1,6 +1,7 @@
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 import 'package:yotsuba_schedule/domain/models/day_task.dart';
+import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
 
 class ScheduleData {
   const ScheduleData({
@@ -9,6 +10,7 @@ class ScheduleData {
     required this.courses,
     required this.dayTasks,
     required this.coursePlans,
+    this.dayOverrides = const [],
   });
 
   final DateTime termStart;
@@ -16,6 +18,7 @@ class ScheduleData {
   final List<Course> courses;
   final List<DayTask> dayTasks;
   final List<CoursePlan> coursePlans;
+  final List<AcademicDayOverride> dayOverrides;
 
   Map<String, Object> toJson() => {
     'termStart': termStart.toIso8601String(),
@@ -23,6 +26,7 @@ class ScheduleData {
     'courses': courses.map((item) => item.toJson()).toList(),
     'dayTasks': dayTasks.map((item) => item.toJson()).toList(),
     'coursePlans': coursePlans.map((item) => item.toJson()).toList(),
+    'dayOverrides': dayOverrides.map((item) => item.toJson()).toList(),
   };
 
   factory ScheduleData.fromJson(Map<String, dynamic> json) {
@@ -37,6 +41,12 @@ class ScheduleData {
           .toList(),
       coursePlans: (json['coursePlans'] as List<dynamic>)
           .map((item) => CoursePlan.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      dayOverrides: (json['dayOverrides'] as List<dynamic>? ?? const [])
+          .map(
+            (item) =>
+                AcademicDayOverride.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
     );
   }

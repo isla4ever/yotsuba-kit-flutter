@@ -1,12 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
-import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
+import 'package:yotsuba_schedule/data/calendar/device_calendar_sync_service.dart';
+import 'package:yotsuba_schedule/data/calendar/schedule_calendar_exporter.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/schedule_data.dart';
 import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
@@ -71,37 +72,32 @@ class _DataManagementSheetState extends ConsumerState<_DataManagementSheet> {
             _DataOption(
               icon: Icons.table_view_outlined,
               color: palette.scheduleAccent,
-              title: '导入课表文件',
-              subtitle: '读取本应用导出的 JSON 课表文件',
+              title: '导入本地备份',
+              subtitle: '读取本应用导出的 JSON 完整备份',
               enabled: !_busy,
               onTap: _importFile,
             ),
             const SizedBox(height: 8),
             _DataOption(
-              icon: Icons.qr_code_rounded,
-              color: const Color(0xFF0F8A72),
-              title: '课表码导入',
-              subtitle: '粘贴分享码，在本机恢复一份课表快照',
-              enabled: !_busy,
-              onTap: _importCode,
-            ),
-            const SizedBox(height: 8),
-            _DataOption(
-              icon: Icons.share_outlined,
+              icon: Icons.ios_share_rounded,
               color: const Color(0xFFC26A1B),
-              title: '分享与备份',
-              subtitle: '分享 JSON 文件或复制只读课表码',
+              title: '导出本地备份',
+              subtitle: '备份课程、计划、待办和携带物品',
               enabled: !_busy,
-              onTap: _showShareOptions,
+              onTap: _shareJson,
             ),
             const SizedBox(height: 8),
             _DataOption(
               icon: Icons.calendar_month_outlined,
               color: const Color(0xFF237A56),
-              title: '导出系统日历',
-              subtitle: '生成包含课程和计划截止时间的 ICS 文件',
+              title: supportsDirectCalendarSync ? '同步到系统日历' : '导出 ICS 日历',
+              subtitle: supportsDirectCalendarSync
+                  ? '授权后直接更新整学期课程、计划和截止时间'
+                  : '为 Web 或桌面端生成可导入的 ICS 文件',
               enabled: !_busy,
-              onTap: _shareCalendar,
+              onTap: supportsDirectCalendarSync
+                  ? _syncSystemCalendar
+                  : _shareCalendar,
             ),
           ],
         ),
@@ -128,84 +124,6 @@ class _DataManagementSheetState extends ConsumerState<_DataManagementSheet> {
     });
   }
 
-  Future<void> _importCode() async {
-    final controller = TextEditingController();
-    final code = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('粘贴课表码'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(hintText: '粘贴以 YS1. 开头的课表码'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('导入'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (code == null || code.trim().isEmpty) {
-      return;
-    }
-    await _run(() async {
-      final value = code.trim();
-      if (!value.startsWith('YS1.')) {
-        throw const FormatException('invalid code');
-      }
-      final normalized = base64Url.normalize(value.substring(4));
-      final data = ScheduleData.fromJson(
-        jsonDecode(utf8.decode(base64Url.decode(normalized)))
-            as Map<String, dynamic>,
-      );
-      ref.read(scheduleControllerProvider.notifier).replaceScheduleData(data);
-      _notify('课表码导入成功');
-    });
-  }
-
-  Future<void> _showShareOptions() async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('分享与备份', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 10),
-              ListTile(
-                leading: const Icon(Icons.file_present_outlined),
-                title: const Text('分享 JSON 文件'),
-                subtitle: const Text('完整备份课程、计划和携带物品'),
-                onTap: () => Navigator.pop(context, 'file'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.content_copy_rounded),
-                title: const Text('复制课表码'),
-                subtitle: const Text('生成离线快照码，不上传任何数据'),
-                onTap: () => Navigator.pop(context, 'code'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (action == 'file') await _shareJson();
-    if (action == 'code') await _copyCode();
-  }
-
   Future<void> _shareJson() async {
     await _run(() async {
       final content = const JsonEncoder.withIndent(
@@ -227,17 +145,14 @@ class _DataManagementSheetState extends ConsumerState<_DataManagementSheet> {
     });
   }
 
-  Future<void> _copyCode() async {
-    await _run(() async {
-      final encoded = base64Url.encode(utf8.encode(jsonEncode(_data.toJson())));
-      await Clipboard.setData(ClipboardData(text: 'YS1.$encoded'));
-      _notify('课表码已复制到剪贴板');
-    });
-  }
-
   Future<void> _shareCalendar() async {
     await _run(() async {
-      final calendar = _buildCalendar(_data);
+      final settings = ref.read(appSettingsProvider);
+      final entries = ScheduleCalendarBuilder.build(
+        _data,
+        settings.summerSchedule ? summerCourseTimes : standardCourseTimes,
+      );
+      final calendar = IcsCalendarSerializer.serialize(entries);
       await SharePlus.instance.share(
         ShareParams(
           subject: 'Yotsuba Schedule 日历',
@@ -254,12 +169,43 @@ class _DataManagementSheetState extends ConsumerState<_DataManagementSheet> {
     });
   }
 
+  Future<void> _syncSystemCalendar() async {
+    await _run(() async {
+      final settings = ref.read(appSettingsProvider);
+      final entries = ScheduleCalendarBuilder.build(
+        _data,
+        settings.summerSchedule ? summerCourseTimes : standardCourseTimes,
+      );
+      final rangeStart = DateTime(
+        _data.termStart.year,
+        _data.termStart.month,
+        _data.termStart.day - 1,
+      );
+      final termEnd = _data.termStart.add(Duration(days: _data.totalWeeks * 7));
+      final planDates = entries.expand((entry) => [entry.start, entry.end]);
+      final rangeEnd = planDates
+          .fold<DateTime>(
+            termEnd,
+            (latest, value) => value.isAfter(latest) ? value : latest,
+          )
+          .add(const Duration(days: 1));
+      final result = await ref
+          .read(deviceCalendarSyncServiceProvider)
+          .sync(entries: entries, rangeStart: rangeStart, rangeEnd: rangeEnd);
+      _notify('已同步 ${result.created} 个日历事件');
+    });
+  }
+
   Future<void> _run(Future<void> Function() action) async {
     setState(() => _busy = true);
     try {
       await action();
+    } on DeviceCalendarSyncException catch (error) {
+      _notifyCalendarError(error);
+    } on FormatException {
+      _notify('操作失败，请确认备份文件格式正确');
     } on Object {
-      _notify('操作失败，请确认文件或课表码格式正确');
+      _notify('操作失败，请稍后重试');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -271,79 +217,25 @@ class _DataManagementSheetState extends ConsumerState<_DataManagementSheet> {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
-}
 
-String _buildCalendar(ScheduleData data) {
-  final buffer = StringBuffer()
-    ..writeln('BEGIN:VCALENDAR')
-    ..writeln('VERSION:2.0')
-    ..writeln('CALSCALE:GREGORIAN')
-    ..writeln('PRODID:-//Yotsuba Schedule//CN');
-  for (final course in data.courses) {
-    for (var week = course.startWeek; week <= course.endWeek; week++) {
-      if (!course.occursInWeek(week)) continue;
-      final date = ScheduleEngine.dateForWeekday(
-        data.termStart,
-        week,
-        course.weekday,
-      );
-      final start = _atTime(date, courseTimes[course.startSection - 1].start);
-      final end = _atTime(date, courseTimes[course.endSection - 1].end);
-      buffer
-        ..writeln('BEGIN:VEVENT')
-        ..writeln('UID:${course.id}-$week@yotsuba-schedule')
-        ..writeln('DTSTAMP:${_icalDate(DateTime.now())}')
-        ..writeln('DTSTART:${_icalDate(start)}')
-        ..writeln('DTEND:${_icalDate(end)}')
-        ..writeln('SUMMARY:${_escapeIcal(course.name)}')
-        ..writeln('LOCATION:${_escapeIcal(course.room)}')
-        ..writeln(
-          'DESCRIPTION:${_escapeIcal('${course.teacher} · 第${course.startSection}-${course.endSection}节')}',
-        )
-        ..writeln('END:VEVENT');
-    }
+  void _notifyCalendarError(DeviceCalendarSyncException error) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(error.message),
+        action: error.failure == DeviceCalendarSyncFailure.denied
+            ? SnackBarAction(
+                label: '前往设置',
+                onPressed: () {
+                  ref.read(deviceCalendarSyncServiceProvider).openAppSettings();
+                },
+              )
+            : null,
+      ),
+    );
   }
-  for (final plan in data.coursePlans.where(
-    (item) => item.calendarSyncEnabled,
-  )) {
-    final start =
-        plan.scheduledStart ??
-        plan.dueAt?.subtract(const Duration(minutes: 30));
-    final end = plan.scheduledEnd ?? plan.dueAt;
-    if (start == null || end == null) continue;
-    final courseName = data.courses
-        .where((course) => course.id == plan.courseId)
-        .map((course) => course.name)
-        .firstOrNull;
-    buffer
-      ..writeln('BEGIN:VEVENT')
-      ..writeln('UID:${plan.id}@yotsuba-schedule')
-      ..writeln('DTSTAMP:${_icalDate(DateTime.now())}')
-      ..writeln('DTSTART:${_icalDate(start)}')
-      ..writeln('DTEND:${_icalDate(end)}')
-      ..writeln('SUMMARY:${_escapeIcal(plan.title)}')
-      ..writeln(
-        'DESCRIPTION:${_escapeIcal('${courseName ?? '课程计划'} · ${plan.notes}')}',
-      )
-      ..writeln('END:VEVENT');
-  }
-  buffer.writeln('END:VCALENDAR');
-  return buffer.toString();
 }
-
-DateTime _atTime(DateTime date, String value) {
-  final parts = value.split(':').map(int.parse).toList();
-  return DateTime(date.year, date.month, date.day, parts[0], parts[1]);
-}
-
-String _icalDate(DateTime value) =>
-    "${DateFormat("yyyyMMdd'T'HHmmss").format(value.toUtc())}Z";
-
-String _escapeIcal(String value) => value
-    .replaceAll('\\', '\\\\')
-    .replaceAll(';', '\\;')
-    .replaceAll(',', '\\,')
-    .replaceAll('\n', '\\n');
 
 class _DataOption extends StatelessWidget {
   const _DataOption({
@@ -425,8 +317,4 @@ class _DataOption extends StatelessWidget {
       ),
     );
   }
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

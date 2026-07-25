@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
+import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 import 'package:yotsuba_schedule/domain/models/day_task.dart';
 import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
@@ -15,18 +17,14 @@ class TodayCourse {
     required this.startMinutes,
     required this.endMinutes,
     required this.status,
+    required this.timeLabel,
   });
 
   final Course course;
   final int startMinutes;
   final int endMinutes;
   final TodayCourseStatus status;
-
-  String get timeLabel {
-    final start = courseTimes[course.startSection - 1].start;
-    final end = courseTimes[course.endSection - 1].end;
-    return '$start-$end';
-  }
+  final String timeLabel;
 }
 
 class TodayViewModel {
@@ -72,6 +70,7 @@ final clockProvider = StreamProvider<DateTime>((ref) async* {
 
 final todayViewModelProvider = Provider<TodayViewModel>((ref) {
   final schedule = ref.watch(scheduleControllerProvider);
+  final settings = ref.watch(appSettingsProvider);
   final now = ref.watch(clockProvider).value ?? DateTime.now();
   final todayMinutes = now.hour * 60 + now.minute;
   final calendarWeek = ScheduleEngine.currentWeek(
@@ -79,18 +78,30 @@ final todayViewModelProvider = Provider<TodayViewModel>((ref) {
     now,
     schedule.totalWeeks,
   );
+  final times = settings.summerSchedule
+      ? summerCourseTimes
+      : standardCourseTimes;
+  final dateKey = ScheduleEngine.dateKey(now);
+  final override = schedule.dayOverrides
+      .where((item) => item.dateKey == dateKey)
+      .firstOrNull;
+  final sourceWeekday = override?.kind == AcademicDayKind.makeUp
+      ? override?.sourceWeekday ?? now.weekday
+      : now.weekday;
+  final isHoliday = override?.kind == AcademicDayKind.holiday;
   final active =
       schedule.courses
           .where((course) {
-            return course.weekday == now.weekday &&
+            return !isHoliday &&
+                course.weekday == sourceWeekday &&
                 course.occursInWeek(calendarWeek);
           })
           .map((course) {
             final start = ScheduleEngine.minutesOf(
-              courseTimes[course.startSection - 1].start,
+              times[course.startSection - 1].start,
             );
             final end = ScheduleEngine.minutesOf(
-              courseTimes[course.endSection - 1].end,
+              times[course.endSection - 1].end,
             );
             final status = todayMinutes >= end
                 ? TodayCourseStatus.finished
@@ -102,6 +113,8 @@ final todayViewModelProvider = Provider<TodayViewModel>((ref) {
               startMinutes: start,
               endMinutes: end,
               status: status,
+              timeLabel:
+                  '${times[course.startSection - 1].start}-${times[course.endSection - 1].end}',
             );
           })
           .toList()

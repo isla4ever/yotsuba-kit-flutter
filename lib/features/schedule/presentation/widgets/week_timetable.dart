@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
+import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
+import 'package:yotsuba_schedule/domain/models/weather.dart';
+import 'package:yotsuba_schedule/features/weather/presentation/weather_glyph.dart';
 
 class WeekTimetable extends StatefulWidget {
   const WeekTimetable({
@@ -12,13 +15,18 @@ class WeekTimetable extends StatefulWidget {
     required this.week,
     required this.courses,
     required this.visibleDays,
-    required this.compact,
+    required this.rowHeight,
+    required this.courseTimes,
+    required this.dayOverrides,
+    required this.weather,
     required this.editing,
     required this.active,
     required this.reduceMotion,
     required this.onCourseTap,
     required this.onEmptyCellTap,
     required this.onDayTap,
+    this.dayGuideKey,
+    this.courseGuideKey,
     super.key,
   });
 
@@ -26,16 +34,22 @@ class WeekTimetable extends StatefulWidget {
   final int week;
   final List<Course> courses;
   final int visibleDays;
-  final bool compact;
+  final double rowHeight;
+  final List<CourseTime> courseTimes;
+  final List<AcademicDayOverride> dayOverrides;
+  final WeatherSnapshot? weather;
   final bool editing;
   final bool active;
   final bool reduceMotion;
   final ValueChanged<Course> onCourseTap;
-  final void Function(int weekday, int section) onEmptyCellTap;
+  final void Function(int weekday, int startSection, int endSection)
+  onEmptyCellTap;
   final ValueChanged<int> onDayTap;
+  final GlobalKey? dayGuideKey;
+  final GlobalKey? courseGuideKey;
 
   static const railWidth = 48.0;
-  static const headerHeight = 58.0;
+  static const headerHeight = 66.0;
   static const breakHeight = 34.0;
   static const topInset = 6.0;
 
@@ -46,19 +60,22 @@ class WeekTimetable extends StatefulWidget {
 class _WeekTimetableState extends State<WeekTimetable>
     with SingleTickerProviderStateMixin {
   late final AnimationController _courseWave;
+  int? _selectionDay;
+  int? _selectionAnchor;
+  int? _selectionEnd;
 
   @override
   void initState() {
     super.initState();
     _courseWave = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 480),
-      value: widget.active && !widget.reduceMotion ? 0.18 : 1,
+      duration: const Duration(milliseconds: 560),
+      value: widget.reduceMotion ? 1 : 0,
     );
     if (widget.active && !widget.reduceMotion) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _courseWave.forward();
+          _courseWave.forward(from: 0);
         }
       });
     }
@@ -72,9 +89,17 @@ class _WeekTimetableState extends State<WeekTimetable>
       return;
     }
     if (widget.active && (!oldWidget.active || oldWidget.week != widget.week)) {
-      _courseWave.forward(from: 0.18);
+      _courseWave.value = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.active) _courseWave.forward();
+      });
     } else if (!widget.active && oldWidget.active) {
-      _courseWave.value = 1;
+      _courseWave.value = 0;
+    }
+    if (!widget.editing && oldWidget.editing) {
+      _selectionDay = null;
+      _selectionAnchor = null;
+      _selectionEnd = null;
     }
   }
 
@@ -86,7 +111,7 @@ class _WeekTimetableState extends State<WeekTimetable>
 
   @override
   Widget build(BuildContext context) {
-    final rowHeight = widget.compact ? 54.0 : 62.0;
+    final rowHeight = widget.rowHeight;
     return LayoutBuilder(
       builder: (context, constraints) {
         final dayWidth =
@@ -100,7 +125,10 @@ class _WeekTimetableState extends State<WeekTimetable>
               dayWidth: dayWidth,
               visibleDays: widget.visibleDays,
               editing: widget.editing,
+              dayOverrides: widget.dayOverrides,
+              weather: widget.weather,
               onDayTap: widget.onDayTap,
+              dayGuideKey: widget.dayGuideKey,
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -108,18 +136,43 @@ class _WeekTimetableState extends State<WeekTimetable>
                   width: constraints.maxWidth,
                   height:
                       WeekTimetable.topInset +
-                      rowHeight * courseTimes.length +
+                      rowHeight * widget.courseTimes.length +
                       WeekTimetable.breakHeight,
-                  child: _GridBody(
-                    week: widget.week,
-                    courses: widget.courses,
-                    rowHeight: rowHeight,
-                    dayWidth: dayWidth,
-                    visibleDays: widget.visibleDays,
-                    editing: widget.editing,
-                    courseWave: _courseWave,
-                    onCourseTap: widget.onCourseTap,
-                    onEmptyCellTap: widget.onEmptyCellTap,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onLongPressStart: widget.editing
+                        ? (details) => _beginSelection(
+                            details.localPosition,
+                            dayWidth,
+                            rowHeight,
+                          )
+                        : null,
+                    onLongPressMoveUpdate: widget.editing
+                        ? (details) => _updateSelection(
+                            details.localPosition,
+                            dayWidth,
+                            rowHeight,
+                          )
+                        : null,
+                    child: _GridBody(
+                      week: widget.week,
+                      courses: widget.courses,
+                      rowHeight: rowHeight,
+                      dayWidth: dayWidth,
+                      visibleDays: widget.visibleDays,
+                      editing: widget.editing,
+                      termStart: widget.termStart,
+                      dayOverrides: widget.dayOverrides,
+                      courseTimes: widget.courseTimes,
+                      courseWave: _courseWave,
+                      selectionDay: _selectionDay,
+                      selectionStart: _selectionStart,
+                      selectionEnd: _selectionEnd,
+                      onCourseTap: widget.onCourseTap,
+                      onEmptyCellTap: widget.onEmptyCellTap,
+                      onSelectionTap: _openSelection,
+                      courseGuideKey: widget.courseGuideKey,
+                    ),
                   ),
                 ),
               ),
@@ -128,6 +181,100 @@ class _WeekTimetableState extends State<WeekTimetable>
         );
       },
     );
+  }
+
+  int? get _selectionStart {
+    if (_selectionAnchor == null || _selectionEnd == null) return null;
+    return math.min(_selectionAnchor!, _selectionEnd!);
+  }
+
+  void _beginSelection(Offset position, double dayWidth, double rowHeight) {
+    final cell = _cellAt(position, dayWidth, rowHeight);
+    if (cell == null || _sectionOccupied(cell.$1, cell.$2)) return;
+    setState(() {
+      _selectionDay = cell.$1;
+      _selectionAnchor = cell.$2;
+      _selectionEnd = cell.$2;
+    });
+  }
+
+  void _updateSelection(Offset position, double dayWidth, double rowHeight) {
+    final day = _selectionDay;
+    final anchor = _selectionAnchor;
+    final cell = _cellAt(position, dayWidth, rowHeight);
+    if (day == null || anchor == null || cell == null || cell.$1 != day) return;
+    final direction = cell.$2 >= anchor ? 1 : -1;
+    var candidate = anchor;
+    for (
+      var section = anchor;
+      section != cell.$2 + direction;
+      section += direction
+    ) {
+      if (_sectionOccupied(day, section)) break;
+      candidate = section;
+    }
+    if (candidate != _selectionEnd) {
+      setState(() => _selectionEnd = candidate);
+    }
+  }
+
+  (int, int)? _cellAt(Offset position, double dayWidth, double rowHeight) {
+    if (position.dx < WeekTimetable.railWidth || position.dy < 0) return null;
+    final day =
+        ((position.dx - WeekTimetable.railWidth) / dayWidth).floor() + 1;
+    if (day < 1 || day > widget.visibleDays) return null;
+    var bodyY = position.dy - WeekTimetable.topInset;
+    if (bodyY < 0) return null;
+    final breakTop = rowHeight * 4;
+    if (bodyY >= breakTop && bodyY < breakTop + WeekTimetable.breakHeight) {
+      return null;
+    }
+    if (bodyY >= breakTop + WeekTimetable.breakHeight) {
+      bodyY -= WeekTimetable.breakHeight;
+    }
+    final section = (bodyY / rowHeight).floor() + 1;
+    if (section < 1 || section > widget.courseTimes.length) return null;
+    return (day, section);
+  }
+
+  bool _sectionOccupied(int day, int section) {
+    final date = ScheduleEngine.dateForWeekday(
+      widget.termStart,
+      widget.week,
+      day,
+    );
+    final dayOverride = widget.dayOverrides
+        .where((item) => item.dateKey == ScheduleEngine.dateKey(date))
+        .firstOrNull;
+    if (dayOverride?.kind == AcademicDayKind.holiday) return false;
+    final sourceWeekday = dayOverride?.kind == AcademicDayKind.makeUp
+        ? dayOverride?.sourceWeekday ?? day
+        : day;
+    return widget.courses.any(
+      (course) =>
+          course.weekday == sourceWeekday &&
+          course.occursInWeek(widget.week) &&
+          section >= course.startSection &&
+          section <= course.endSection,
+    );
+  }
+
+  void _openSelection() {
+    final day = _selectionDay;
+    final start = _selectionStart;
+    final end = _selectionEnd;
+    if (day == null || start == null || end == null) return;
+    widget.onEmptyCellTap(day, start, end);
+    _clearSelection();
+  }
+
+  void _clearSelection() {
+    if (_selectionDay == null) return;
+    setState(() {
+      _selectionDay = null;
+      _selectionAnchor = null;
+      _selectionEnd = null;
+    });
   }
 }
 
@@ -138,7 +285,10 @@ class _WeekHeader extends StatelessWidget {
     required this.dayWidth,
     required this.visibleDays,
     required this.editing,
+    required this.dayOverrides,
+    required this.weather,
     required this.onDayTap,
+    this.dayGuideKey,
   });
 
   final DateTime termStart;
@@ -146,7 +296,10 @@ class _WeekHeader extends StatelessWidget {
   final double dayWidth;
   final int visibleDays;
   final bool editing;
+  final List<AcademicDayOverride> dayOverrides;
+  final WeatherSnapshot? weather;
   final ValueChanged<int> onDayTap;
+  final GlobalKey? dayGuideKey;
 
   static const labels = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -184,13 +337,31 @@ class _WeekHeader extends StatelessWidget {
             ),
           ),
           for (var day = 1; day <= visibleDays; day++)
-            _DayHeader(
-              width: dayWidth,
-              label: labels[day - 1],
-              date: ScheduleEngine.dateForWeekday(termStart, week, day),
-              editing: editing,
-              isLast: day == visibleDays,
-              onTap: () => onDayTap(day),
+            Builder(
+              builder: (context) {
+                final date = ScheduleEngine.dateForWeekday(
+                  termStart,
+                  week,
+                  day,
+                );
+                return _DayHeader(
+                  key: day == 1 ? dayGuideKey : null,
+                  width: dayWidth,
+                  label: labels[day - 1],
+                  date: date,
+                  dayOverride: dayOverrides
+                      .where(
+                        (item) => item.dateKey == ScheduleEngine.dateKey(date),
+                      )
+                      .firstOrNull,
+                  weather: weather?.weatherForDate(
+                    ScheduleEngine.dateKey(date),
+                  ),
+                  editing: editing,
+                  isLast: day == visibleDays,
+                  onTap: () => onDayTap(day),
+                );
+              },
             ),
         ],
       ),
@@ -200,9 +371,12 @@ class _WeekHeader extends StatelessWidget {
 
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
+    super.key,
     required this.width,
     required this.label,
     required this.date,
+    required this.dayOverride,
+    required this.weather,
     required this.editing,
     required this.isLast,
     required this.onTap,
@@ -211,6 +385,8 @@ class _DayHeader extends StatelessWidget {
   final double width;
   final String label;
   final DateTime date;
+  final AcademicDayOverride? dayOverride;
+  final DailyWeather? weather;
   final bool editing;
   final bool isLast;
   final VoidCallback onTap;
@@ -240,21 +416,50 @@ class _DayHeader extends StatelessWidget {
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: isToday
-                          ? palette.scheduleAccent
-                          : palette.textSoft,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: isToday
+                              ? palette.scheduleAccent
+                              : palette.textSoft,
+                        ),
+                      ),
+                      if (weather != null) ...[
+                        const SizedBox(width: 2),
+                        WeatherGlyph(
+                          kind: weatherPresentation(weather!.weatherCode).kind,
+                          size: 13,
+                          animate: false,
+                          color: palette.textFaint,
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
                     DateFormat('M/d').format(date),
                     style: TextStyle(fontSize: 9, color: palette.textFaint),
                   ),
+                  if (dayOverride != null)
+                    Text(
+                      dayOverride!.kind == AcademicDayKind.makeUp
+                          ? '补班'
+                          : dayOverride!.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w700,
+                        color: dayOverride!.kind == AcademicDayKind.makeUp
+                            ? palette.warning
+                            : palette.danger,
+                      ),
+                    ),
                 ],
               ),
               if (isToday)
@@ -280,25 +485,42 @@ class _DayHeader extends StatelessWidget {
 class _GridBody extends StatelessWidget {
   const _GridBody({
     required this.week,
+    required this.termStart,
     required this.courses,
+    required this.dayOverrides,
+    required this.courseTimes,
     required this.rowHeight,
     required this.dayWidth,
     required this.visibleDays,
     required this.editing,
     required this.courseWave,
+    required this.selectionDay,
+    required this.selectionStart,
+    required this.selectionEnd,
     required this.onCourseTap,
     required this.onEmptyCellTap,
+    required this.onSelectionTap,
+    this.courseGuideKey,
   });
 
   final int week;
+  final DateTime termStart;
   final List<Course> courses;
+  final List<AcademicDayOverride> dayOverrides;
+  final List<CourseTime> courseTimes;
   final double rowHeight;
   final double dayWidth;
   final int visibleDays;
   final bool editing;
   final Animation<double> courseWave;
+  final int? selectionDay;
+  final int? selectionStart;
+  final int? selectionEnd;
   final ValueChanged<Course> onCourseTap;
-  final void Function(int weekday, int section) onEmptyCellTap;
+  final void Function(int weekday, int startSection, int endSection)
+  onEmptyCellTap;
+  final VoidCallback onSelectionTap;
+  final GlobalKey? courseGuideKey;
 
   double _sectionTop(int section) {
     return WeekTimetable.topInset +
@@ -309,9 +531,7 @@ class _GridBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final visibleCourses = courses
-        .where((course) => course.weekday <= visibleDays)
-        .toList();
+    final visibleCourses = _displayCourses();
     final groups = _groupCourses(visibleCourses);
 
     return ClipRect(
@@ -343,6 +563,7 @@ class _GridBody extends StatelessWidget {
                 height: rowHeight,
                 child: _TimeRow(
                   section: section,
+                  time: courseTimes[section - 1],
                   editing: editing,
                   bottomBorder: editing,
                 ),
@@ -409,18 +630,68 @@ class _GridBody extends StatelessWidget {
                     child: Semantics(
                       button: true,
                       label: '周$day第$section节空白时间',
-                      child: InkWell(onTap: () => onEmptyCellTap(day, section)),
+                      child: InkWell(
+                        onTap: () => onEmptyCellTap(day, section, section),
+                      ),
                     ),
                   ),
             ],
-            for (final group in groups) _positionedCourse(context, group),
+            if (editing &&
+                selectionDay != null &&
+                selectionStart != null &&
+                selectionEnd != null)
+              Positioned(
+                top: _sectionTop(selectionStart!),
+                left: WeekTimetable.railWidth + (selectionDay! - 1) * dayWidth,
+                width: dayWidth,
+                height:
+                    (selectionEnd! - selectionStart! + 1) * rowHeight +
+                    (selectionStart! <= 4 && selectionEnd! > 4
+                        ? WeekTimetable.breakHeight
+                        : 0),
+                child: _SelectionHighlight(
+                  startSection: selectionStart!,
+                  endSection: selectionEnd!,
+                  onTap: onSelectionTap,
+                ),
+              ),
+            for (var index = 0; index < groups.length; index++)
+              _positionedCourse(
+                context,
+                groups[index],
+                key: index == 0 ? courseGuideKey : null,
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _positionedCourse(BuildContext context, List<Course> group) {
+  List<Course> _displayCourses() {
+    final result = <Course>[];
+    for (var day = 1; day <= visibleDays; day++) {
+      final date = ScheduleEngine.dateForWeekday(termStart, week, day);
+      final override = dayOverrides
+          .where((item) => item.dateKey == ScheduleEngine.dateKey(date))
+          .firstOrNull;
+      if (override?.kind == AcademicDayKind.holiday) continue;
+      final sourceWeekday = override?.kind == AcademicDayKind.makeUp
+          ? override?.sourceWeekday ?? day
+          : day;
+      result.addAll(
+        courses
+            .where((course) => course.weekday == sourceWeekday)
+            .map((course) => course.copyWith(weekday: day)),
+      );
+    }
+    return result;
+  }
+
+  Widget _positionedCourse(
+    BuildContext context,
+    List<Course> group, {
+    Key? key,
+  }) {
     final active = group.where((course) => course.occursInWeek(week));
     final course = active.isNotEmpty ? active.first : group.first;
     final top = _sectionTop(course.startSection);
@@ -429,6 +700,7 @@ class _GridBody extends StatelessWidget {
     final height =
         span * rowHeight + (includesBreak ? WeekTimetable.breakHeight : 0);
     return Positioned(
+      key: key,
       top: top,
       left: WeekTimetable.railWidth + (course.weekday - 1) * dayWidth,
       width: dayWidth,
@@ -489,6 +761,62 @@ class _GridBody extends StatelessWidget {
   }
 }
 
+class _SelectionHighlight extends StatelessWidget {
+  const _SelectionHighlight({
+    required this.startSection,
+    required this.endSection,
+    required this.onTap,
+  });
+
+  final int startSection;
+  final int endSection;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final label = startSection == endSection
+        ? '第 $startSection 节'
+        : '第 $startSection-$endSection 节';
+    return Padding(
+      padding: const EdgeInsets.all(3),
+      child: Material(
+        color: palette.scheduleAccentSoft.withValues(alpha: 0.92),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(7),
+          side: BorderSide(color: palette.scheduleAccent, width: 1.5),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(7),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add_circle_rounded,
+                  size: 20,
+                  color: palette.scheduleAccent,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: palette.scheduleAccent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _WaveCourseReveal extends StatelessWidget {
   const _WaveCourseReveal({
     required this.animation,
@@ -512,10 +840,14 @@ class _WaveCourseReveal extends StatelessWidget {
         );
         final value = Curves.easeOutCubic.transform(normalized);
         return Opacity(
-          opacity: 0.72 + value * 0.28,
+          opacity: value,
           child: Transform.translate(
-            offset: Offset(0, (1 - value) * 4),
-            child: child,
+            offset: Offset(0, (1 - value) * 8),
+            child: Transform.scale(
+              scale: 0.992 + value * 0.008,
+              alignment: Alignment.topCenter,
+              child: child,
+            ),
           ),
         );
       },
@@ -526,18 +858,19 @@ class _WaveCourseReveal extends StatelessWidget {
 class _TimeRow extends StatelessWidget {
   const _TimeRow({
     required this.section,
+    required this.time,
     required this.editing,
     required this.bottomBorder,
   });
 
   final int section;
+  final CourseTime time;
   final bool editing;
   final bool bottomBorder;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final time = courseTimes[section - 1];
     return Container(
       decoration: editing
           ? BoxDecoration(
@@ -575,6 +908,10 @@ class _TimeRow extends StatelessWidget {
       ),
     );
   }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 class _CourseCard extends StatelessWidget {

@@ -6,6 +6,8 @@ import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
 import 'package:yotsuba_schedule/features/onboarding/application/schedule_onboarding_controller.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
+import 'package:yotsuba_schedule/features/announcements/presentation/announcement_manager_sheet.dart';
+import 'package:yotsuba_schedule/features/settings/presentation/academic_calendar_sheet.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -24,12 +26,12 @@ class SettingsScreen extends ConsumerWidget {
         bottom: false,
         child: ListView(
           key: const PageStorageKey('settings-scroll'),
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
           children: [
             Text(
               '设置',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 30,
                 fontWeight: FontWeight.w800,
                 color: palette.text,
               ),
@@ -37,9 +39,9 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 2),
             Text(
               '让课表适应你的设备和使用习惯',
-              style: TextStyle(fontSize: 11, color: palette.textSoft),
+              style: TextStyle(fontSize: 13, color: palette.textSoft),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
             const _SectionLabel(label: '外观'),
             _SettingsCard(
               children: [
@@ -69,12 +71,15 @@ class SettingsScreen extends ConsumerWidget {
                   onChanged: settingsController.setShowWeekend,
                 ),
                 _SettingsSwitch(
-                  icon: Icons.compress_rounded,
-                  title: '紧凑课表',
-                  subtitle: '缩短节次高度，一屏查看更多课程',
-                  value: settings.compactSchedule,
-                  onChanged: settingsController.setCompactSchedule,
-                  last: true,
+                  icon: Icons.wb_sunny_outlined,
+                  title: '夏季作息',
+                  subtitle: '下午课程统一延后 30 分钟',
+                  value: settings.summerSchedule,
+                  onChanged: settingsController.setSummerSchedule,
+                ),
+                _ScheduleHeightRow(
+                  value: settings.scheduleRowHeight,
+                  onChanged: settingsController.setScheduleRowHeight,
                 ),
               ],
             ),
@@ -90,6 +95,18 @@ class SettingsScreen extends ConsumerWidget {
                     ref.read(scheduleOnboardingProvider.notifier).replay();
                     context.go('/schedule');
                   },
+                ),
+                _InfoRow(
+                  icon: Icons.date_range_outlined,
+                  title: '学期、节假日与补班',
+                  subtitle: '配置开学日期、总周数并刷新中国法定节假日',
+                  onTap: () => showAcademicCalendarSheet(context),
+                ),
+                _InfoRow(
+                  icon: Icons.campaign_outlined,
+                  title: '本机公告中心',
+                  subtitle: '创建、预览和发布启动公告弹窗',
+                  onTap: () => showAnnouncementManagerSheet(context),
                 ),
                 _InfoRow(
                   icon: Icons.location_on_outlined,
@@ -189,6 +206,63 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed == true) {
       ref.read(scheduleControllerProvider.notifier).resetMockData();
     }
+  }
+}
+
+class _ScheduleHeightRow extends StatelessWidget {
+  const _ScheduleHeightRow({required this.value, required this.onChanged});
+
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.height_rounded, size: 19, color: palette.textSoft),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '节次高度',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text('按设备与阅读习惯调整课表纵向空间', style: TextStyle(fontSize: 9)),
+                  ],
+                ),
+              ),
+              Text(
+                '${value.round()} px',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: palette.scheduleAccent,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value.clamp(54, 78),
+            min: 54,
+            max: 78,
+            divisions: 12,
+            label: '${value.round()} px',
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
   }
 }
 

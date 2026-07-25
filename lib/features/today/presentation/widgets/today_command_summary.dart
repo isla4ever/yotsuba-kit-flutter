@@ -3,9 +3,14 @@ import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/features/today/application/today_view_model.dart';
 
 class TodayCommandSummary extends StatelessWidget {
-  const TodayCommandSummary({required this.viewModel, super.key});
+  const TodayCommandSummary({
+    required this.viewModel,
+    required this.weatherHint,
+    super.key,
+  });
 
   final TodayViewModel viewModel;
+  final String weatherHint;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +34,7 @@ class TodayCommandSummary extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 340;
         return Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: palette.surface,
             border: Border.all(color: palette.border),
@@ -52,8 +57,8 @@ class TodayCommandSummary extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          height: 21,
-                          padding: const EdgeInsets.symmetric(horizontal: 7),
+                          height: 24,
+                          padding: const EdgeInsets.symmetric(horizontal: 9),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: lead?.status == TodayCourseStatus.ongoing
@@ -66,7 +71,7 @@ class TodayCommandSummary extends StatelessWidget {
                           child: Text(
                             state,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: FontWeight.w800,
                               color: lead?.status == TodayCourseStatus.ongoing
                                   ? palette.todayAccent
@@ -76,22 +81,22 @@ class TodayCommandSummary extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 10),
                         Text(
                           lead?.course.name ??
                               (viewModel.courses.isEmpty
                                   ? '今天没有课程'
                                   : '今天的课已全部结束'),
-                          maxLines: compact ? 2 : 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             height: 1.2,
-                            fontSize: compact ? 18 : 20,
+                            fontSize: compact ? 21 : 24,
                             fontWeight: FontWeight.w800,
                             color: palette.text,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           lead == null
                               ? (viewModel.courses.isEmpty
@@ -101,15 +106,15 @@ class TodayCommandSummary extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: palette.textSoft,
                           ),
                         ),
-                        const SizedBox(height: 9),
+                        const SizedBox(height: 12),
                         Text(
                           countdown,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: palette.todayAccent,
                           ),
@@ -118,12 +123,12 @@ class TodayCommandSummary extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: compact ? 10 : 14),
-                  _ProgressRing(progress: progress, size: compact ? 62 : 72),
+                  _ProgressRing(progress: progress, size: compact ? 74 : 84),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Divider(height: 1, color: palette.border),
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               Row(
                 children: [
                   _Metric(
@@ -147,21 +152,21 @@ class TodayCommandSummary extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 9),
+              const SizedBox(height: 13),
               Row(
                 children: [
                   Icon(
                     Icons.info_outline_rounded,
-                    size: 13,
+                    size: 16,
                     color: palette.textFaint,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '体感较舒适，17°-24°',
+                      weatherHint,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 10, color: palette.textSoft),
+                      style: TextStyle(fontSize: 12, color: palette.textSoft),
                     ),
                   ),
                 ],
@@ -192,7 +197,7 @@ class _ProgressRing extends StatelessWidget {
           SizedBox.expand(
             child: CircularProgressIndicator(
               value: progress / 100,
-              strokeWidth: 6,
+              strokeWidth: 7,
               strokeCap: StrokeCap.round,
               backgroundColor: palette.track,
               valueColor: AlwaysStoppedAnimation(palette.todayAccent),
@@ -205,14 +210,14 @@ class _ProgressRing extends StatelessWidget {
                 '$progress%',
                 style: TextStyle(
                   height: 1.05,
-                  fontSize: 15,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: palette.text,
                 ),
               ),
               Text(
                 '课程进度',
-                style: TextStyle(fontSize: 8, color: palette.textFaint),
+                style: TextStyle(fontSize: 9, color: palette.textFaint),
               ),
             ],
           ),
@@ -235,13 +240,13 @@ class _Metric extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(label, style: TextStyle(fontSize: 9, color: palette.textFaint)),
-          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 11, color: palette.textFaint)),
+          const SizedBox(height: 4),
           Text.rich(
             TextSpan(
               text: value,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: palette.text,
               ),
@@ -249,7 +254,7 @@ class _Metric extends StatelessWidget {
                 TextSpan(
                   text: unit,
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: palette.textSoft,
                   ),
@@ -270,5 +275,5 @@ class _MetricDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Container(width: 1, height: 34, color: color);
+      Container(width: 1, height: 42, color: color);
 }

@@ -9,6 +9,7 @@ import 'package:yotsuba_schedule/data/mock/mock_schedule_repository.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 import 'package:yotsuba_schedule/domain/models/day_task.dart';
+import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
 import 'package:yotsuba_schedule/domain/models/schedule_data.dart';
 
 @immutable
@@ -20,6 +21,7 @@ class ScheduleState {
     required this.courses,
     required this.dayTasks,
     required this.coursePlans,
+    required this.dayOverrides,
   });
 
   final DateTime termStart;
@@ -28,20 +30,25 @@ class ScheduleState {
   final List<Course> courses;
   final List<DayTask> dayTasks;
   final List<CoursePlan> coursePlans;
+  final List<AcademicDayOverride> dayOverrides;
 
   ScheduleState copyWith({
+    DateTime? termStart,
+    int? totalWeeks,
     int? currentWeek,
     List<Course>? courses,
     List<DayTask>? dayTasks,
     List<CoursePlan>? coursePlans,
+    List<AcademicDayOverride>? dayOverrides,
   }) {
     return ScheduleState(
-      termStart: termStart,
-      totalWeeks: totalWeeks,
+      termStart: termStart ?? this.termStart,
+      totalWeeks: totalWeeks ?? this.totalWeeks,
       currentWeek: currentWeek ?? this.currentWeek,
       courses: courses ?? this.courses,
       dayTasks: dayTasks ?? this.dayTasks,
       coursePlans: coursePlans ?? this.coursePlans,
+      dayOverrides: dayOverrides ?? this.dayOverrides,
     );
   }
 
@@ -51,6 +58,7 @@ class ScheduleState {
     courses: courses,
     dayTasks: dayTasks,
     coursePlans: coursePlans,
+    dayOverrides: dayOverrides,
   );
 }
 
@@ -87,6 +95,7 @@ class ScheduleController extends Notifier<ScheduleState> {
       courses: data.courses,
       dayTasks: data.dayTasks,
       coursePlans: data.coursePlans,
+      dayOverrides: data.dayOverrides,
     );
   }
 
@@ -106,6 +115,7 @@ class ScheduleController extends Notifier<ScheduleState> {
       courses: data.courses,
       dayTasks: data.dayTasks,
       coursePlans: data.coursePlans,
+      dayOverrides: data.dayOverrides,
     );
     _persist();
   }
@@ -118,6 +128,61 @@ class ScheduleController extends Notifier<ScheduleState> {
         state.totalWeeks,
       ),
     );
+  }
+
+  void updateAcademicTerm(DateTime termStart, int totalWeeks) {
+    final normalized = DateTime(
+      termStart.year,
+      termStart.month,
+      termStart.day - (termStart.weekday - 1),
+    );
+    final weeks = totalWeeks.clamp(1, 30);
+    state = state.copyWith(
+      termStart: normalized,
+      totalWeeks: weeks,
+      currentWeek: ScheduleEngine.currentWeek(
+        normalized,
+        DateTime.now(),
+        weeks,
+      ),
+    );
+    _persist();
+  }
+
+  void replaceRemoteDayOverrides(List<AcademicDayOverride> remote) {
+    final remoteYears = remote.map((item) => item.date.year).toSet();
+    final manual = state.dayOverrides.where(
+      (item) => item.isManual || !remoteYears.contains(item.date.year),
+    );
+    final manualKeys = manual.map((item) => item.dateKey).toSet();
+    final merged = <AcademicDayOverride>[
+      ...manual,
+      ...remote.where((item) => !manualKeys.contains(item.dateKey)),
+    ]..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    state = state.copyWith(dayOverrides: merged);
+    _persist();
+  }
+
+  void upsertDayOverride(AcademicDayOverride value) {
+    final items = [...state.dayOverrides];
+    final index = items.indexWhere((item) => item.dateKey == value.dateKey);
+    if (index == -1) {
+      items.add(value);
+    } else {
+      items[index] = value;
+    }
+    items.sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    state = state.copyWith(dayOverrides: items);
+    _persist();
+  }
+
+  void deleteDayOverride(String dateKey) {
+    state = state.copyWith(
+      dayOverrides: state.dayOverrides
+          .where((item) => item.dateKey != dateKey)
+          .toList(),
+    );
+    _persist();
   }
 
   void addCourse(Course course) {
@@ -324,12 +389,24 @@ class ScheduleController extends Notifier<ScheduleState> {
     final ranges = <(DateTime, DateTime)>[];
     final week = day.difference(state.termStart).inDays ~/ 7 + 1;
     if (week >= 1 && week <= state.totalWeeks) {
+      final dateKey = ScheduleEngine.dateKey(day);
+      final dayOverride = state.dayOverrides
+          .where((item) => item.dateKey == dateKey)
+          .firstOrNull;
+      final sourceWeekday = dayOverride?.kind == AcademicDayKind.makeUp
+          ? dayOverride?.sourceWeekday ?? day.weekday
+          : day.weekday;
+      final times = ref.read(appSettingsProvider).summerSchedule
+          ? summerCourseTimes
+          : standardCourseTimes;
       for (final course in state.courses) {
-        if (course.weekday != day.weekday || !course.occursInWeek(week)) {
+        if (dayOverride?.kind == AcademicDayKind.holiday ||
+            course.weekday != sourceWeekday ||
+            !course.occursInWeek(week)) {
           continue;
         }
-        final start = _atTime(day, courseTimes[course.startSection - 1].start);
-        final end = _atTime(day, courseTimes[course.endSection - 1].end);
+        final start = _atTime(day, times[course.startSection - 1].start);
+        final end = _atTime(day, times[course.endSection - 1].end);
         ranges.add((start, end));
       }
     }

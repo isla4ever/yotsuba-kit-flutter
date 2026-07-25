@@ -10,6 +10,8 @@ class ScheduleActionDock extends StatelessWidget {
     required this.onOpenSettings,
     required this.onReplayGuide,
     required this.onAdd,
+    this.toolsGuideKey,
+    this.addGuideKey,
     super.key,
   });
 
@@ -20,6 +22,8 @@ class ScheduleActionDock extends StatelessWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onReplayGuide;
   final VoidCallback onAdd;
+  final GlobalKey? toolsGuideKey;
+  final GlobalKey? addGuideKey;
 
   @override
   Widget build(BuildContext context) {
@@ -73,21 +77,27 @@ class ScheduleActionDock extends StatelessWidget {
                 )
               : const SizedBox.shrink(key: ValueKey('empty')),
         ),
-        _DockButton(
-          label: '课表工具',
-          icon: Icons.handyman_outlined,
-          active: editing || menuOpen,
-          color: palette.surfaceRaised,
-          foreground: palette.textSoft,
-          onTap: onToggleMenu,
+        KeyedSubtree(
+          key: toolsGuideKey,
+          child: _DockButton(
+            label: '课表工具',
+            icon: Icons.handyman_outlined,
+            active: editing || menuOpen,
+            color: palette.surfaceRaised,
+            foreground: palette.textSoft,
+            onTap: onToggleMenu,
+          ),
         ),
         const SizedBox(height: 8),
-        _DockButton(
-          label: '新增课程',
-          icon: Icons.add_rounded,
-          color: palette.scheduleAccent,
-          foreground: Colors.white,
-          onTap: onAdd,
+        KeyedSubtree(
+          key: addGuideKey,
+          child: _DockButton(
+            label: '新增课程',
+            icon: Icons.add_rounded,
+            color: palette.scheduleAccent,
+            foreground: Colors.white,
+            onTap: onAdd,
+          ),
         ),
       ],
     );

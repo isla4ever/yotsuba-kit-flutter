@@ -4,6 +4,12 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于匹配当前位置天气，并为课程提供出行提醒。</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>用于将课程、课程计划和截止时间同步到系统日历。</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>用于管理 Yotsuba Schedule 创建的课程、计划和截止事件。</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>用于将课程和计划添加到系统日历。</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

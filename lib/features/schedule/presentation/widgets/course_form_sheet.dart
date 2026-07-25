@@ -10,6 +10,7 @@ Future<Course?> showCourseFormSheet(
   int? initialWeekday,
   int? initialStartSection,
   int? initialEndSection,
+  Set<int> usedColorValues = const {},
 }) {
   return showModalBottomSheet<Course>(
     context: context,
@@ -22,6 +23,7 @@ Future<Course?> showCourseFormSheet(
       initialWeekday: initialWeekday,
       initialStartSection: initialStartSection,
       initialEndSection: initialEndSection,
+      usedColorValues: usedColorValues,
     ),
   );
 }
@@ -34,6 +36,7 @@ class _CourseForm extends StatefulWidget {
     this.initialWeekday,
     this.initialStartSection,
     this.initialEndSection,
+    this.usedColorValues = const {},
   });
 
   final int currentWeek;
@@ -42,6 +45,7 @@ class _CourseForm extends StatefulWidget {
   final int? initialWeekday;
   final int? initialStartSection;
   final int? initialEndSection;
+  final Set<int> usedColorValues;
 
   @override
   State<_CourseForm> createState() => _CourseFormState();
@@ -59,7 +63,7 @@ class _CourseFormState extends State<_CourseForm> {
   late WeekPattern _pattern;
   late int _colorValue;
 
-  static const _colors = [
+  static const _paletteColors = [
     0xFF2C8B7F,
     0xFF5874B8,
     0xFFE56B4A,
@@ -68,7 +72,21 @@ class _CourseFormState extends State<_CourseForm> {
     0xFF30779A,
     0xFF71853E,
     0xFFB45C72,
+    0xFF3A9D7D,
+    0xFF4E8BC4,
+    0xFF735CB0,
+    0xFFC45F4F,
+    0xFFD18C38,
+    0xFF568B55,
+    0xFF2B8793,
+    0xFF9B7048,
+    0xFFB65D8A,
+    0xFF687FAD,
+    0xFF8A8040,
+    0xFF516F67,
   ];
+
+  late final List<int> _colors;
 
   @override
   void initState() {
@@ -84,7 +102,17 @@ class _CourseFormState extends State<_CourseForm> {
     _startWeek = initial?.startWeek ?? widget.currentWeek;
     _endWeek = initial?.endWeek ?? widget.totalWeeks;
     _pattern = initial?.pattern ?? WeekPattern.every;
-    _colorValue = initial?.colorValue ?? _colors.first;
+    _colors = [
+      if (initial != null && !_paletteColors.contains(initial.colorValue))
+        initial.colorValue,
+      ..._paletteColors,
+    ];
+    _colorValue =
+        initial?.colorValue ??
+        _colors.firstWhere(
+          (value) => !widget.usedColorValues.contains(value),
+          orElse: () => _colors.first,
+        );
   }
 
   @override
@@ -314,37 +342,25 @@ class _CourseFormState extends State<_CourseForm> {
                     ),
                     const SizedBox(height: 14),
                     Text('课程颜色', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 3),
+                    Text(
+                      '正在使用的颜色会保留给对应课程，避免课表辨识混乱。',
+                      style: TextStyle(fontSize: 11, color: palette.textFaint),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: [
                         for (final value in _colors)
-                          InkWell(
-                            onTap: () => setState(() => _colorValue = value),
-                            borderRadius: BorderRadius.circular(20),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: Color(value),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _colorValue == value
-                                      ? palette.text
-                                      : Colors.transparent,
-                                  width: 2.5,
-                                ),
-                              ),
-                              child: _colorValue == value
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      size: 18,
-                                      color: Colors.white,
-                                    )
-                                  : null,
-                            ),
+                          _ColorSwatch(
+                            value: value,
+                            selected: _colorValue == value,
+                            disabled:
+                                widget.usedColorValues.contains(value) &&
+                                widget.initial?.colorValue != value,
+                            onSelected: () =>
+                                setState(() => _colorValue = value),
                           ),
                       ],
                     ),
@@ -391,6 +407,69 @@ class _CourseFormState extends State<_CourseForm> {
         colorValue: _colorValue,
         isCustom: initial?.isCustom ?? true,
         materials: initial?.materials ?? const [],
+      ),
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
+    required this.value,
+    required this.selected,
+    required this.disabled,
+    required this.onSelected,
+  });
+
+  final int value;
+  final bool selected;
+  final bool disabled;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Semantics(
+      button: true,
+      enabled: !disabled,
+      selected: selected,
+      label: disabled ? '该课程颜色已被使用' : '选择课程颜色',
+      child: InkWell(
+        onTap: disabled ? null : onSelected,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedOpacity(
+          opacity: disabled ? 0.28 : 1,
+          duration: const Duration(milliseconds: 160),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Color(value),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? palette.text : Colors.transparent,
+                width: 2.5,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: Color(value).withValues(alpha: 0.32),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              disabled
+                  ? Icons.remove_rounded
+                  : selected
+                  ? Icons.check_rounded
+                  : null,
+              size: 18,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ),
     );
   }

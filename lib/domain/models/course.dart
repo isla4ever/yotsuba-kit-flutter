@@ -129,7 +129,7 @@ class CourseTime {
   final String end;
 }
 
-const courseTimes = <CourseTime>[
+const standardCourseTimes = <CourseTime>[
   CourseTime('08:00', '08:45'),
   CourseTime('08:55', '09:40'),
   CourseTime('10:00', '10:45'),
@@ -143,3 +143,20 @@ const courseTimes = <CourseTime>[
   CourseTime('20:25', '21:10'),
   CourseTime('21:20', '22:05'),
 ];
+
+const summerCourseTimes = <CourseTime>[
+  CourseTime('08:00', '08:45'),
+  CourseTime('08:55', '09:40'),
+  CourseTime('10:00', '10:45'),
+  CourseTime('10:55', '11:40'),
+  CourseTime('15:00', '15:45'),
+  CourseTime('15:55', '16:40'),
+  CourseTime('16:50', '17:35'),
+  CourseTime('17:45', '18:30'),
+  CourseTime('18:40', '19:25'),
+  CourseTime('19:35', '20:20'),
+  CourseTime('20:30', '21:15'),
+  CourseTime('21:25', '22:10'),
+];
+
+const courseTimes = standardCourseTimes;

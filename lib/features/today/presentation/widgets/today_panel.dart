@@ -4,7 +4,7 @@ import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 class TodayPanel extends StatelessWidget {
   const TodayPanel({
     required this.child,
-    this.padding = const EdgeInsets.all(10),
+    this.padding = const EdgeInsets.all(16),
     this.constraints,
     super.key,
   });
@@ -61,17 +61,17 @@ class TodaySectionHeading extends StatelessWidget {
                 eyebrow,
                 style: TextStyle(
                   height: 1.15,
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: palette.textFaint,
                 ),
               ),
-              const SizedBox(height: 1),
+              const SizedBox(height: 3),
               Text(
                 title,
                 style: TextStyle(
                   height: 1.25,
-                  fontSize: 13,
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: palette.text,
                 ),

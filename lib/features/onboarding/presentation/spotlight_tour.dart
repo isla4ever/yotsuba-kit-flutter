@@ -58,7 +58,8 @@ class _SpotlightTourState extends State<SpotlightTour> {
     }
     final global = target.localToGlobal(Offset.zero);
     final origin = overlay.localToGlobal(Offset.zero);
-    final rect = (global - origin) & target.size;
+    final relative = Offset(global.dx - origin.dx, global.dy - origin.dy);
+    final rect = relative & target.size;
     setState(() => _targetRect = rect.inflate(7));
   }
 
@@ -92,12 +93,13 @@ class _SpotlightTourState extends State<SpotlightTour> {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: _next,
-                    child: TweenAnimationBuilder<Rect>(
-                      tween: Tween<Rect>(end: rect),
+                    child: TweenAnimationBuilder<Rect?>(
+                      tween: RectTween(end: rect),
                       duration: duration,
                       curve: Curves.easeInOutCubicEmphasized,
-                      builder: (context, value, _) =>
-                          CustomPaint(painter: _SpotlightPainter(rect: value)),
+                      builder: (context, value, _) => CustomPaint(
+                        painter: _SpotlightPainter(rect: value ?? rect),
+                      ),
                     ),
                   ),
                 ),
@@ -150,16 +152,14 @@ class _SpotlightPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.saveLayer(Offset.zero & size, Paint());
-    canvas.drawRect(
-      Offset.zero & size,
+    final spotlight = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Offset.zero & size)
+      ..addRRect(RRect.fromRectAndRadius(rect, const Radius.circular(11)));
+    canvas.drawPath(
+      spotlight,
       Paint()..color = const Color(0xFF0B1110).withValues(alpha: 0.74),
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(11)),
-      Paint()..blendMode = BlendMode.clear,
-    );
-    canvas.restore();
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(11)),
       Paint()

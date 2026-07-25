@@ -33,14 +33,21 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   late final PageController _weekController;
   bool _editing = false;
   bool _toolMenuOpen = false;
+  late int _settledWeek;
+  final _screenGuideKey = GlobalKey();
   final _weekGuideKey = GlobalKey();
-  final _timetableGuideKey = GlobalKey();
+  final _courseGuideKey = GlobalKey();
+  final _dayGuideKey = GlobalKey();
+  final _weatherGuideKey = GlobalKey();
   final _toolsGuideKey = GlobalKey();
+  final _addGuideKey = GlobalKey();
+  final _dataGuideKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     final week = ref.read(scheduleControllerProvider).currentWeek;
+    _settledWeek = week;
     _weekController = PageController(initialPage: week - 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -92,31 +99,33 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         child: Stack(
           children: [
             Column(
+              key: _screenGuideKey,
               children: [
-                KeyedSubtree(
-                  key: _weekGuideKey,
-                  child: ScheduleHeader(
-                    week: schedule.currentWeek,
-                    dateRange: range,
-                    weather: weather,
-                    reduceMotion: settings.reduceMotion,
-                    onSelectWeek: () => _showWeekPicker(schedule, controller),
-                    onWeather: () => ref
-                        .read(weatherControllerProvider.notifier)
-                        .requestLocation(),
-                    onManage: () => showDataManagementSheet(context),
-                  ),
+                ScheduleHeader(
+                  week: schedule.currentWeek,
+                  dateRange: range,
+                  weather: weather,
+                  reduceMotion: settings.reduceMotion,
+                  onSelectWeek: () => _showWeekPicker(schedule, controller),
+                  onWeather: () => ref
+                      .read(weatherControllerProvider.notifier)
+                      .requestLocation(),
+                  onManage: () => showDataManagementSheet(context),
+                  weekGuideKey: _weekGuideKey,
+                  weatherGuideKey: _weatherGuideKey,
+                  dataGuideKey: _dataGuideKey,
                 ),
                 Expanded(
-                  child: KeyedSubtree(
-                    key: _timetableGuideKey,
-                    child: AnimatedContainer(
-                      duration: settings.reduceMotion
-                          ? Duration.zero
-                          : const Duration(milliseconds: 300),
-                      color: _editing
-                          ? context.palette.canvas.withValues(alpha: 0.96)
-                          : Colors.transparent,
+                  child: AnimatedContainer(
+                    duration: settings.reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 300),
+                    color: _editing
+                        ? context.palette.canvas.withValues(alpha: 0.96)
+                        : Colors.transparent,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) =>
+                          _handleWeekScroll(notification, controller),
                       child: PageView.builder(
                         controller: _weekController,
                         itemCount: schedule.totalWeeks,
@@ -131,10 +140,15 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                             termStart: schedule.termStart,
                             week: week,
                             courses: schedule.courses,
+                            dayOverrides: schedule.dayOverrides,
+                            weather: weather.snapshot,
                             visibleDays: settings.showWeekend ? 7 : 5,
-                            compact: settings.compactSchedule,
+                            rowHeight: settings.scheduleRowHeight,
+                            courseTimes: settings.summerSchedule
+                                ? summerCourseTimes
+                                : standardCourseTimes,
                             editing: _editing,
-                            active: schedule.currentWeek == week,
+                            active: _settledWeek == week,
                             reduceMotion: settings.reduceMotion,
                             onCourseTap: (course) => _showCourse(course, week),
                             onDayTap: (weekday) => showDayPlannerSheet(
@@ -145,12 +159,19 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                                 weekday,
                               ),
                             ),
-                            onEmptyCellTap: (weekday, section) => _addCourse(
+                            onEmptyCellTap: (weekday, start, end) => _addCourse(
                               controller,
                               schedule,
                               weekday: weekday,
-                              section: section,
+                              section: start,
+                              endSection: end,
                             ),
+                            dayGuideKey: week == schedule.currentWeek
+                                ? _dayGuideKey
+                                : null,
+                            courseGuideKey: week == schedule.currentWeek
+                                ? _courseGuideKey
+                                : null,
                           );
                         },
                       ),
@@ -163,7 +184,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               right: 12,
               bottom: 12,
               child: ScheduleActionDock(
-                key: _toolsGuideKey,
                 editing: _editing,
                 menuOpen: _toolMenuOpen,
                 onToggleMenu: () =>
@@ -181,6 +201,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                   ref.read(scheduleOnboardingProvider.notifier).replay();
                 },
                 onAdd: () => _addCourse(controller, schedule),
+                toolsGuideKey: _toolsGuideKey,
+                addGuideKey: _addGuideKey,
               ),
             ),
             if (onboarding.active)
@@ -191,19 +213,49 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                     ref.read(scheduleOnboardingProvider.notifier).finish(),
                 steps: [
                   SpotlightStep(
-                    target: _weekGuideKey,
-                    title: '先认识课表顶部',
-                    body: '点击周数可快速跳转，天气按钮会匹配当前位置，右侧入口管理导入、分享和日历。',
+                    target: _screenGuideKey,
+                    title: '快速认识你的课表',
+                    body: '依次了解换周、课程、天气、计划和编辑。可随时关闭，之后也能从工具中重新打开。',
                   ),
                   SpotlightStep(
-                    target: _timetableGuideKey,
-                    title: '跟手浏览每一周',
-                    body: '左右拖动时页面会紧跟手势。点击星期日期安排当天计划，点击课程查看计划和携带物品。',
+                    target: _weekGuideKey,
+                    title: '切换教学周',
+                    body: '点击周数可快速跳转；左右滑动课表，则适合连续浏览前后周。',
+                  ),
+                  SpotlightStep(
+                    target: _courseGuideKey,
+                    title: '查看课程详情',
+                    body: '点击课程查看时间、地点和当日天气，也能继续管理作业计划与携带物品。',
+                  ),
+                  SpotlightStep(
+                    target: _dayGuideKey,
+                    title: '安排当天计划',
+                    body: '点击星期与日期，可记录这一天的待办，完成后直接勾选。',
+                  ),
+                  SpotlightStep(
+                    target: _weatherGuideKey,
+                    title: '课程天气联动',
+                    body: '授权定位后显示当前天气；预报范围内的课程详情也会给出出行提示。',
                   ),
                   SpotlightStep(
                     target: _toolsGuideKey,
-                    title: '编辑与新增课程',
-                    body: '工具按钮可切换编辑模式，也能随时重新播放本引导；加号用于手动新增课程。',
+                    title: '编辑课表',
+                    body: '在工具里切换编辑模式，即可长按空白节次并向下拖选。本引导也可在这里重新打开。',
+                  ),
+                  SpotlightStep(
+                    target: _addGuideKey,
+                    title: '手动新增课程',
+                    body: '点击加号新增课程，可设置星期、节次、周次、单双周和课程颜色。',
+                  ),
+                  SpotlightStep(
+                    target: _dataGuideKey,
+                    title: '导入、备份与日历',
+                    body: '在这里导入或备份本地 JSON，并把课程和计划导出为系统日历。',
+                  ),
+                  SpotlightStep(
+                    target: _screenGuideKey,
+                    title: '今日指挥台',
+                    body: '进入“今日”后，集中查看下一节课、剩余课程、未完成计划和上课准备。',
                   ),
                 ],
               ),
@@ -218,6 +270,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     ScheduleState schedule, {
     int? weekday,
     int? section,
+    int? endSection,
   }) async {
     setState(() => _toolMenuOpen = false);
     final course = await showCourseFormSheet(
@@ -226,6 +279,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       totalWeeks: schedule.totalWeeks,
       initialWeekday: weekday,
       initialStartSection: section,
+      initialEndSection: endSection,
+      usedColorValues: schedule.courses.map((item) => item.colorValue).toSet(),
     );
     if (course != null) controller.addCourse(course);
   }
@@ -233,6 +288,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Future<void> _showCourse(Course course, int week) async {
     final schedule = ref.read(scheduleControllerProvider);
     final controller = ref.read(scheduleControllerProvider.notifier);
+    final original = schedule.courses.firstWhere(
+      (item) => item.id == course.id,
+      orElse: () => course,
+    );
     final date = ScheduleEngine.dateForWeekday(
       schedule.termStart,
       week,
@@ -242,9 +301,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final weather = weatherState.weatherForDate(ScheduleEngine.dateKey(date));
     final action = await showCourseDetailSheet(
       context,
-      course: course,
+      course: original,
       plans: schedule.coursePlans
-          .where((plan) => plan.courseId == course.id)
+          .where((plan) => plan.courseId == original.id)
           .toList(),
       weather: weather,
       weatherHint: _weatherHint(weatherState),
@@ -256,7 +315,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           context,
           currentWeek: schedule.currentWeek,
           totalWeeks: schedule.totalWeeks,
-          initial: course,
+          initial: original,
+          usedColorValues: schedule.courses
+              .where((item) => item.id != original.id)
+              .map((item) => item.colorValue)
+              .toSet(),
         );
         if (edited != null) controller.updateCourse(edited);
       case CourseDetailAction.delete:
@@ -264,7 +327,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('删除课程？'),
-            content: Text('“${course.name}”及其课程计划将从本机移除。'),
+            content: Text('“${original.name}”及其课程计划将从本机移除。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -277,11 +340,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             ],
           ),
         );
-        if (confirmed == true) controller.deleteCourse(course.id);
+        if (confirmed == true) controller.deleteCourse(original.id);
       case CourseDetailAction.plans:
-        await showCoursePlanSheet(context, course: course);
+        await showCoursePlanSheet(context, course: original);
       case CourseDetailAction.materials:
-        await showCourseMaterialsSheet(context, course: course);
+        await showCourseMaterialsSheet(context, course: original);
     }
   }
 
@@ -363,7 +426,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       },
     );
     if (selected == null) return;
-    controller.setWeek(selected);
     if (!_weekController.hasClients) return;
     final current = (_weekController.page ?? (schedule.currentWeek - 1))
         .round();
@@ -374,7 +436,27 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         curve: Curves.easeOutCubic,
       );
     } else {
+      setState(() => _settledWeek = 0);
       _weekController.jumpToPage(selected - 1);
+    }
+    if (mounted) _settleWeek(selected, controller);
+  }
+
+  bool _handleWeekScroll(
+    ScrollNotification notification,
+    ScheduleController controller,
+  ) {
+    if (notification is ScrollEndNotification && _weekController.hasClients) {
+      final week = (_weekController.page ?? 0).round() + 1;
+      _settleWeek(week, controller);
+    }
+    return false;
+  }
+
+  void _settleWeek(int week, ScheduleController controller) {
+    controller.setWeek(week);
+    if (_settledWeek != week && mounted) {
+      setState(() => _settledWeek = week);
     }
   }
 }

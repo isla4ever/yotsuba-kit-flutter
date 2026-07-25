@@ -50,7 +50,7 @@ class TodayScreen extends ConsumerWidget {
             final wide = constraints.maxWidth >= 700;
             return SingleChildScrollView(
               key: const PageStorageKey('today-scroll'),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 920),
@@ -65,14 +65,20 @@ class TodayScreen extends ConsumerWidget {
                             .read(weatherControllerProvider.notifier)
                             .requestLocation(),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       if (wide)
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
                               flex: 108,
-                              child: TodayCommandSummary(viewModel: viewModel),
+                              child: TodayCommandSummary(
+                                viewModel: viewModel,
+                                weatherHint: _weatherHint(
+                                  weather,
+                                  viewModel.now,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -85,14 +91,17 @@ class TodayScreen extends ConsumerWidget {
                           ],
                         )
                       else ...[
-                        TodayCommandSummary(viewModel: viewModel),
-                        const SizedBox(height: 12),
+                        TodayCommandSummary(
+                          viewModel: viewModel,
+                          weatherHint: _weatherHint(weather, viewModel.now),
+                        ),
+                        const SizedBox(height: 16),
                         TodayCourseTimeline(
                           courses: viewModel.courses,
                           onOpenSchedule: () => context.go('/schedule'),
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       TodayReadinessBoard(
                         dayTasks: viewModel.dayTasks,
                         coursePlans: viewModel.coursePlans,
@@ -158,7 +167,7 @@ class _TodayHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return SizedBox(
-      height: 68,
+      height: 98,
       child: Row(
         children: [
           Expanded(
@@ -167,22 +176,27 @@ class _TodayHeading extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$greeting · $dateLabel',
+                  greeting,
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: palette.textSoft,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 5),
                 Text(
                   '今日指挥台',
                   style: TextStyle(
                     height: 1.1,
-                    fontSize: 27,
+                    fontSize: 32,
                     fontWeight: FontWeight.w800,
                     color: palette.text,
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dateLabel,
+                  style: TextStyle(fontSize: 12, color: palette.textFaint),
                 ),
               ],
             ),
@@ -225,9 +239,9 @@ class _WeatherChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          height: 44,
-          constraints: const BoxConstraints(minWidth: 84),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 52,
+          constraints: const BoxConstraints(minWidth: 94),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: palette.surface.withValues(alpha: 0.88),
             border: Border.all(color: palette.border),
@@ -256,7 +270,7 @@ class _WeatherChip extends StatelessWidget {
                   children: [
                     WeatherGlyph(
                       kind: presentation?.kind ?? WeatherKind.neutral,
-                      size: 20,
+                      size: 23,
                       animate: !reduceMotion && snapshot != null,
                       color: palette.textSoft,
                     ),
@@ -269,7 +283,7 @@ class _WeatherChip extends StatelessWidget {
                           Text(
                             '${snapshot.currentTemperature.round()}°',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 15,
                               fontWeight: FontWeight.w800,
                               color: palette.text,
                             ),
@@ -277,7 +291,7 @@ class _WeatherChip extends StatelessWidget {
                           Text(
                             presentation!.label,
                             style: TextStyle(
-                              fontSize: 9,
+                              fontSize: 10,
                               color: palette.textFaint,
                             ),
                           ),
@@ -287,7 +301,7 @@ class _WeatherChip extends StatelessWidget {
                       Text(
                         '天气',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: palette.textSoft,
                         ),
@@ -302,4 +316,15 @@ class _WeatherChip extends StatelessWidget {
 
 extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
+}
+
+String _weatherHint(WeatherState state, DateTime date) {
+  final daily = state.weatherForDate(DateFormat('yyyy-MM-dd').format(date));
+  if (daily == null) {
+    return state.message.isEmpty ? '授权定位后查看今日出行提示' : state.message;
+  }
+  final label = weatherPresentation(daily.weatherCode).label;
+  final rain = daily.precipitationProbability;
+  final rainHint = rain == null || rain < 30 ? '' : ' · 降水概率 $rain%';
+  return '$label ${daily.temperatureMin.round()}°-${daily.temperatureMax.round()}°$rainHint';
 }

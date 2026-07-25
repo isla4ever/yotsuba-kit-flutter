@@ -25,7 +25,7 @@ class TodayCourseTimeline extends StatelessWidget {
             .toList();
 
     return TodayPanel(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       child: Column(
         children: [
           TodaySectionHeading(
@@ -37,7 +37,7 @@ class TodayCourseTimeline extends StatelessWidget {
                 minimumSize: const Size(0, 32),
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 foregroundColor: palette.todayAccent,
-                textStyle: const TextStyle(fontSize: 10),
+                textStyle: const TextStyle(fontSize: 12),
               ),
               child: const Row(
                 children: [
@@ -51,13 +51,13 @@ class TodayCourseTimeline extends StatelessWidget {
             _EmptyTimeline(onTap: onOpenSchedule)
           else
             Padding(
-              padding: const EdgeInsets.only(top: 7),
+              padding: const EdgeInsets.only(top: 10),
               child: Stack(
                 children: [
                   Positioned(
                     top: 14,
                     bottom: 14,
-                    left: 74,
+                    left: 82,
                     child: Container(width: 1, color: palette.border),
                   ),
                   Column(
@@ -97,20 +97,20 @@ class _TimelineItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
         child: SizedBox(
-          height: 38,
+          height: 52,
           child: Row(
             children: [
               SizedBox(
-                width: 64,
+                width: 72,
                 child: Text(
                   item.timeLabel,
-                  style: TextStyle(fontSize: 9, color: palette.textSoft),
+                  style: TextStyle(fontSize: 11, color: palette.textSoft),
                 ),
               ),
               const SizedBox(width: 5),
               Container(
-                width: 9,
-                height: 9,
+                width: 11,
+                height: 11,
                 decoration: BoxDecoration(
                   color: ongoing ? palette.todayAccent : palette.blue,
                   shape: BoxShape.circle,
@@ -123,7 +123,7 @@ class _TimelineItem extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 9),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -134,7 +134,7 @@ class _TimelineItem extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: palette.text,
                       ),
@@ -143,7 +143,7 @@ class _TimelineItem extends StatelessWidget {
                       item.course.room,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 9, color: palette.textFaint),
+                      style: TextStyle(fontSize: 11, color: palette.textFaint),
                     ),
                   ],
                 ),
@@ -159,7 +159,7 @@ class _TimelineItem extends StatelessWidget {
                 child: Text(
                   status,
                   style: TextStyle(
-                    fontSize: 8,
+                    fontSize: 10,
                     color: ongoing ? palette.todayAccent : palette.textSoft,
                   ),
                 ),
@@ -185,7 +185,7 @@ class _EmptyTimeline extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       child: Container(
         width: double.infinity,
-        height: 48,
+        height: 64,
         margin: const EdgeInsets.only(top: 6),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -196,7 +196,7 @@ class _EmptyTimeline extends StatelessWidget {
           children: [
             Icon(
               Icons.calendar_month_outlined,
-              size: 20,
+              size: 24,
               color: palette.todayAccent,
             ),
             const SizedBox(width: 8),
@@ -207,14 +207,14 @@ class _EmptyTimeline extends StatelessWidget {
                 Text(
                   '今天没有排课',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: palette.text,
                   ),
                 ),
                 Text(
                   '点击查看完整课表安排',
-                  style: TextStyle(fontSize: 9, color: palette.textFaint),
+                  style: TextStyle(fontSize: 11, color: palette.textFaint),
                 ),
               ],
             ),

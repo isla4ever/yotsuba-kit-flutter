@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
+import 'package:yotsuba_schedule/features/announcements/application/local_announcement_controller.dart';
+import 'package:yotsuba_schedule/features/announcements/presentation/local_announcement_dialog.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -19,6 +21,7 @@ class _AppShellState extends ConsumerState<AppShell>
   late final AnimationController _controller;
   late int _lastIndex;
   var _direction = 1.0;
+  var _announcementShown = false;
 
   @override
   void initState() {
@@ -26,14 +29,26 @@ class _AppShellState extends ConsumerState<AppShell>
     _lastIndex = widget.navigationShell.currentIndex;
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: const Duration(milliseconds: 380),
       value: 1,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        ref.read(weatherControllerProvider.notifier).requestAutomatically();
+        _startServices();
       }
     });
+  }
+
+  Future<void> _startServices() async {
+    await ref.read(weatherControllerProvider.notifier).requestAutomatically();
+    if (!mounted || _announcementShown) return;
+    final announcement = ref.read(localAnnouncementProvider).latestUnmuted;
+    if (announcement == null) return;
+    _announcementShown = true;
+    final muted = await showLocalAnnouncementDialog(context, announcement);
+    if (muted && mounted) {
+      ref.read(localAnnouncementProvider.notifier).mute(announcement.id);
+    }
   }
 
   @override
@@ -58,20 +73,20 @@ class _AppShellState extends ConsumerState<AppShell>
     final reduceMotion = ref.watch(appSettingsProvider).reduceMotion;
     final animation = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
     );
     return Scaffold(
       body: reduceMotion
           ? widget.navigationShell
           : FadeTransition(
-              opacity: Tween<double>(begin: 0.72, end: 1).animate(animation),
+              opacity: Tween<double>(begin: 0.9, end: 1).animate(animation),
               child: SlideTransition(
                 position: Tween<Offset>(
-                  begin: Offset(0.018 * _direction, 0),
+                  begin: Offset(0.007 * _direction, 0.003),
                   end: Offset.zero,
                 ).animate(animation),
                 child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.995, end: 1).animate(animation),
+                  scale: Tween<double>(begin: 0.999, end: 1).animate(animation),
                   child: widget.navigationShell,
                 ),
               ),
