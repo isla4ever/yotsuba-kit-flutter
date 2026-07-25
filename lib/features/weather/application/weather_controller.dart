@@ -9,6 +9,7 @@ import 'package:yotsuba_schedule/data/weather/weather_repository.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 
 const _weatherCacheKey = 'weather.snapshot.v1';
+const _weatherSourceKey = 'weather.source.v1';
 const _weatherAutoRequestKey = 'weather.autoRequest.v1';
 const _cacheTtl = Duration(minutes: 30);
 
@@ -28,21 +29,25 @@ class WeatherState {
     this.status = WeatherStatus.idle,
     this.snapshot,
     this.message = '',
+    this.campusFallback = false,
   });
 
   final WeatherStatus status;
   final WeatherSnapshot? snapshot;
   final String message;
+  final bool campusFallback;
 
   WeatherState copyWith({
     WeatherStatus? status,
     WeatherSnapshot? snapshot,
     String? message,
+    bool? campusFallback,
   }) {
     return WeatherState(
       status: status ?? this.status,
       snapshot: snapshot ?? this.snapshot,
       message: message ?? this.message,
+      campusFallback: campusFallback ?? this.campusFallback,
     );
   }
 
@@ -66,7 +71,15 @@ class WeatherController extends Notifier<WeatherState> {
       final snapshot = WeatherSnapshot.fromJson(
         jsonDecode(raw) as Map<String, dynamic>,
       );
-      return WeatherState(status: WeatherStatus.ready, snapshot: snapshot);
+      return WeatherState(
+        status: WeatherStatus.ready,
+        snapshot: snapshot,
+        campusFallback:
+            ref
+                .watch(sharedPreferencesProvider)
+                ?.getString(_weatherSourceKey) ==
+            'campus',
+      );
     } on Object {
       return const WeatherState();
     }
@@ -76,14 +89,20 @@ class WeatherController extends Notifier<WeatherState> {
     final preferences = ref.read(sharedPreferencesProvider);
     if (preferences?.getBool(_weatherAutoRequestKey) == true) {
       final snapshot = state.snapshot;
-      if (snapshot != null &&
-          DateTime.now().difference(snapshot.fetchedAt) > _cacheTtl) {
-        await _refresh(snapshot.latitude, snapshot.longitude);
+      if (snapshot != null) {
+        if (DateTime.now().difference(snapshot.fetchedAt) > _cacheTtl) {
+          await _refresh(
+            snapshot.latitude,
+            snapshot.longitude,
+            campusFallback: state.campusFallback,
+          );
+        }
+        return;
       }
-      return;
     }
     await preferences?.setBool(_weatherAutoRequestKey, true);
-    await requestLocation();
+    final status = await requestLocation();
+    if (status != WeatherStatus.ready) await useCampusWeather();
   }
 
   Future<WeatherStatus> requestLocation() async {
@@ -135,7 +154,11 @@ class WeatherController extends Notifier<WeatherState> {
         );
         return state.status;
       }
-      await _refresh(position.latitude, position.longitude);
+      await _refresh(
+        position.latitude,
+        position.longitude,
+        campusFallback: false,
+      );
       return state.status;
     } on PermissionDeniedException {
       state = state.copyWith(
@@ -169,7 +192,7 @@ class WeatherController extends Notifier<WeatherState> {
       status: WeatherStatus.loading,
       message: '正在获取学校附近天气',
     );
-    await _refresh(34.60, 119.22);
+    await _refresh(34.60, 119.22, campusFallback: true);
     return state.status;
   }
 
@@ -181,7 +204,11 @@ class WeatherController extends Notifier<WeatherState> {
     return Geolocator.openAppSettings();
   }
 
-  Future<void> _refresh(double latitude, double longitude) async {
+  Future<void> _refresh(
+    double latitude,
+    double longitude, {
+    required bool campusFallback,
+  }) async {
     try {
       final snapshot = await ref
           .read(weatherRepositoryProvider)
@@ -189,11 +216,19 @@ class WeatherController extends Notifier<WeatherState> {
       await ref
           .read(sharedPreferencesProvider)
           ?.setString(_weatherCacheKey, jsonEncode(snapshot.toJson()));
-      state = WeatherState(status: WeatherStatus.ready, snapshot: snapshot);
-    } on Object {
+      await ref
+          .read(sharedPreferencesProvider)
+          ?.setString(_weatherSourceKey, campusFallback ? 'campus' : 'device');
+      state = WeatherState(
+        status: WeatherStatus.ready,
+        snapshot: snapshot,
+        campusFallback: campusFallback,
+      );
+    } on Object catch (error) {
+      if (kDebugMode) debugPrint('Weather refresh failed: $error');
       state = state.copyWith(
         status: WeatherStatus.error,
-        message: '天气暂时不可用，点击可重试',
+        message: kDebugMode ? '天气请求失败：$error' : '天气服务连接失败，请稍后重试',
       );
     }
   }

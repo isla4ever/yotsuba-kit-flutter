@@ -681,8 +681,8 @@ class _GridBody extends StatelessWidget {
       child: _WaveCourseReveal(
         animation: courseWave,
         delay: math.min(
-          0.19,
-          (course.weekday - 1) * 0.021 + (course.startSection - 1) * 0.008,
+          0.13,
+          (course.weekday - 1) * 0.014 + (course.startSection - 1) * 0.005,
         ),
         child: Stack(
           clipBehavior: Clip.none,
@@ -811,13 +811,13 @@ class _WaveCourseReveal extends StatelessWidget {
           0.0,
           1.0,
         );
-        final value = Curves.easeInOutCubic.transform(normalized);
+        final value = Curves.easeOutCubic.transform(normalized);
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, (1 - value) * 6),
+            offset: Offset(0, (1 - value) * 4),
             child: Transform.scale(
-              scale: 0.996 + value * 0.004,
+              scale: 0.998 + value * 0.002,
               alignment: Alignment.topCenter,
               child: child,
             ),
@@ -866,7 +866,7 @@ class _PageRevealAnimation extends Animation<double> {
         ? controller.page ?? controller.initialPage.toDouble()
         : controller.initialPage.toDouble();
     final proximity = (1 - (page - pageIndex).abs()).clamp(0.0, 1.0);
-    return ((proximity - 0.04) / 0.84).clamp(0.0, 1.0);
+    return (proximity / 0.68).clamp(0.0, 1.0);
   }
 }
 

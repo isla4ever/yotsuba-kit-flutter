@@ -59,7 +59,12 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           builder: (context, constraints) {
             return SingleChildScrollView(
               key: const PageStorageKey('today-scroll'),
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+              padding: EdgeInsets.fromLTRB(
+                constraints.maxWidth < 360 ? 12 : 18,
+                14,
+                constraints.maxWidth < 360 ? 12 : 18,
+                24,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 920),
@@ -178,6 +183,16 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               course: course,
                             ),
                             onEmptyTap: () => context.go('/schedule'),
+                            compact:
+                                layout
+                                    .where(
+                                      (item) =>
+                                          item.id == TodayTileId.materials,
+                                    )
+                                    .firstOrNull
+                                    ?.size
+                                    .rows ==
+                                1,
                           ),
                         },
                       ),
@@ -196,6 +211,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final controller = ref.read(weatherControllerProvider.notifier);
     final status = await controller.requestLocation();
     if (!mounted || status == WeatherStatus.ready) return;
+    final locationMessage = ref.read(weatherControllerProvider).message;
+    final fallbackStatus = await controller.useCampusWeather();
+    if (!mounted) return;
+    if (fallbackStatus == WeatherStatus.ready) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$locationMessage，已显示学校附近天气')));
+      return;
+    }
     await showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
@@ -225,7 +249,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 6),
-                Text(state.message, style: TextStyle(color: palette.textSoft)),
+                Text(
+                  '$locationMessage；${state.message}',
+                  style: TextStyle(color: palette.textSoft),
+                ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -235,7 +262,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                           Navigator.pop(context);
                           await controller.useCampusWeather();
                         },
-                        child: const Text('使用学校天气'),
+                        child: const Text('重试学校天气'),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -503,7 +530,9 @@ class _WeatherChip extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            presentation!.label,
+                            weather.campusFallback
+                                ? '校园 · ${presentation!.label}'
+                                : presentation!.label,
                             style: TextStyle(
                               fontSize: 10,
                               color: palette.textFaint,

@@ -331,40 +331,50 @@ class TodayMaterialsPanel extends StatelessWidget {
     required this.materials,
     required this.onOpenCourse,
     required this.onEmptyTap,
+    this.compact = false,
     super.key,
   });
 
   final List<(Course, List<String>)> materials;
   final ValueChanged<Course> onOpenCourse;
   final VoidCallback onEmptyTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final itemCount = materials.fold<int>(
+      0,
+      (total, group) => total + group.$2.length,
+    );
     return TodayPanel(
+      padding: EdgeInsets.all(compact ? 10 : 12),
       child: Column(
         children: [
           TodaySectionHeading(
             eyebrow: '出发检查',
             title: '今天要带什么',
-            trailing: Icon(
-              Icons.menu_book_outlined,
-              size: 21,
-              color: palette.todayAccent,
-            ),
+            trailing: materials.isEmpty
+                ? Icon(
+                    Icons.menu_book_outlined,
+                    size: 21,
+                    color: palette.scheduleAccent,
+                  )
+                : _MaterialCountBadge(count: itemCount),
           ),
           if (materials.isEmpty)
             _PanelEmpty(
               icon: Icons.bookmark_add_outlined,
               label: '还没有设置携带资料',
               onTap: onEmptyTap,
+              compact: compact,
             )
           else
             Padding(
               padding: const EdgeInsets.only(top: 9),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final twoColumns = constraints.maxWidth >= 430;
+                  final twoColumns = constraints.maxWidth >= 300;
                   final width = twoColumns
                       ? (constraints.maxWidth - 8) / 2
                       : constraints.maxWidth;
@@ -372,7 +382,9 @@ class TodayMaterialsPanel extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 7,
                     children: [
-                      for (final group in materials.take(twoColumns ? 4 : 2))
+                      for (final group in materials.take(
+                        twoColumns ? (compact ? 2 : 4) : (compact ? 1 : 2),
+                      ))
                         SizedBox(
                           width: width,
                           child: _MaterialCourseRow(
@@ -410,10 +422,14 @@ class _MaterialCourseRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(7),
       child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 9),
+        height: 68,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: palette.surfaceMuted,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [palette.scheduleAccentSoft, palette.surfaceMuted],
+          ),
           border: Border.all(color: palette.border.withValues(alpha: 0.72)),
           borderRadius: BorderRadius.circular(7),
         ),
@@ -421,10 +437,13 @@ class _MaterialCourseRow extends StatelessWidget {
           children: [
             Container(
               width: 30,
-              height: 30,
+              height: 44,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: palette.scheduleAccentSoft,
+                color: palette.surface.withValues(alpha: 0.72),
+                border: Border.all(
+                  color: palette.scheduleAccent.withValues(alpha: 0.14),
+                ),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
@@ -443,17 +462,50 @@ class _MaterialCourseRow extends StatelessWidget {
                     course.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 10, color: palette.textFaint),
-                  ),
-                  Text(
-                    names.join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: palette.text,
+                      color: palette.textSoft,
                     ),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      for (final name in names.take(2))
+                        Flexible(
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: palette.surface.withValues(alpha: 0.76),
+                              border: Border.all(color: palette.border),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: palette.text,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (names.length > 2)
+                        Text(
+                          '+${names.length - 2}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: palette.scheduleAccent,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -465,6 +517,43 @@ class _MaterialCourseRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MaterialCountBadge extends StatelessWidget {
+  const _MaterialCountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: palette.scheduleAccentSoft,
+        border: Border.all(
+          color: palette.scheduleAccent.withValues(alpha: 0.16),
+        ),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: palette.scheduleAccent,
+            ),
+          ),
+          const SizedBox(width: 3),
+          Text('件', style: TextStyle(fontSize: 9, color: palette.textSoft)),
+        ],
       ),
     );
   }

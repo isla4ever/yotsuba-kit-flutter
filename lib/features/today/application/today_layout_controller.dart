@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 
-const _todayLayoutKey = 'today.dashboard.layout.v1';
+const _todayLayoutKey = 'today.dashboard.layout.v2';
+const _legacyTodayLayoutKey = 'today.dashboard.layout.v1';
 
 enum TodayTileId { command, timeline, tasks, courseWork, materials }
 
@@ -79,28 +80,49 @@ final todayLayoutProvider =
 class TodayLayoutController extends Notifier<List<TodayTileConfig>> {
   @override
   List<TodayTileConfig> build() {
-    final raw = ref
-        .watch(sharedPreferencesProvider)
-        ?.getString(_todayLayoutKey);
-    if (raw == null) return defaultTodayLayout;
+    final preferences = ref.watch(sharedPreferencesProvider);
+    final current = _decodeLayout(preferences?.getString(_todayLayoutKey));
+    if (current.isNotEmpty) return _completeLayout(current);
+
+    final legacy = _decodeLayout(preferences?.getString(_legacyTodayLayoutKey));
+    final migrated = legacy.isEmpty
+        ? defaultTodayLayout
+        : _completeLayout([
+            for (final item in legacy)
+              item.copyWith(size: _defaultSizeFor(item.id)),
+          ]);
+    preferences?.setString(
+      _todayLayoutKey,
+      jsonEncode(migrated.map((item) => item.toJson()).toList()),
+    );
+    return migrated;
+  }
+
+  List<TodayTileConfig> _decodeLayout(String? raw) {
+    if (raw == null) return const [];
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return defaultTodayLayout;
-      final stored = decoded
+      if (decoded is! List) return const [];
+      return decoded
           .map(TodayTileConfig.fromJson)
           .whereType<TodayTileConfig>()
           .toList();
-      final ids = stored.map((item) => item.id).toSet();
-      if (stored.isEmpty) return defaultTodayLayout;
-      return [
-        ...stored,
-        for (final item in defaultTodayLayout)
-          if (!ids.contains(item.id)) item,
-      ];
     } on Object {
-      return defaultTodayLayout;
+      return const [];
     }
   }
+
+  List<TodayTileConfig> _completeLayout(List<TodayTileConfig> stored) {
+    final ids = stored.map((item) => item.id).toSet();
+    return [
+      ...stored,
+      for (final item in defaultTodayLayout)
+        if (!ids.contains(item.id)) item,
+    ];
+  }
+
+  TodayTileSize _defaultSizeFor(TodayTileId id) =>
+      defaultTodayLayout.firstWhere((item) => item.id == id).size;
 
   void moveBefore(TodayTileId moving, TodayTileId target) {
     if (moving == target) return;

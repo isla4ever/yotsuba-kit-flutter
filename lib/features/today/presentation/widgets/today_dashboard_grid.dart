@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/features/today/application/today_layout_controller.dart';
@@ -25,52 +27,130 @@ class TodayDashboardGrid extends StatelessWidget {
   final ValueChanged<TodayTileId> onHide;
 
   static const _gap = 12.0;
+  static const _rowHeight = 152.0;
 
   @override
   Widget build(BuildContext context) {
     final visible = layout.where((item) => item.visible).toList();
     return LayoutBuilder(
       builder: (context, constraints) {
-        final twoColumns = constraints.maxWidth >= 330;
+        final twoColumns = constraints.maxWidth >= 280;
+        final columnCount = twoColumns ? 2 : 1;
         final columnWidth = twoColumns
             ? (constraints.maxWidth - _gap) / 2
             : constraints.maxWidth;
+        final placements = _placeTiles(visible, columnCount);
+        final occupiedRows = placements.fold<int>(
+          0,
+          (maximum, item) =>
+              math.max(maximum, item.row + item.config.size.rows),
+        );
+        final totalHeight = occupiedRows == 0
+            ? 0.0
+            : occupiedRows * _rowHeight + (occupiedRows - 1) * _gap;
         return AnimatedSize(
           duration: reduceMotion
               ? Duration.zero
               : const Duration(milliseconds: 360),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: Wrap(
-            spacing: _gap,
-            runSpacing: _gap,
-            children: [
-              for (final tile in visible)
-                _DashboardTile(
-                  key: ValueKey(tile.id),
-                  config: tile,
-                  width: !twoColumns || tile.size.columns == 2
-                      ? constraints.maxWidth
-                      : columnWidth,
-                  height: switch (tile.size.rows) {
-                    1 => 176,
-                    2 => 296,
-                    _ => 604,
-                  },
-                  editing: editing,
-                  reduceMotion: reduceMotion,
-                  onRequestEdit: onRequestEdit,
-                  onMove: onMove,
-                  onResize: onResize,
-                  onHide: onHide,
-                  child: children[tile.id] ?? const SizedBox.shrink(),
-                ),
-            ],
+          child: SizedBox(
+            height: totalHeight,
+            child: Stack(
+              children: [
+                for (final placement in placements)
+                  AnimatedPositioned(
+                    key: ValueKey(placement.config.id),
+                    duration: reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 360),
+                    curve: Curves.easeOutCubic,
+                    left: placement.column * (columnWidth + _gap),
+                    top: placement.row * (_rowHeight + _gap),
+                    width: (!twoColumns || placement.config.size.columns == 2)
+                        ? constraints.maxWidth
+                        : columnWidth,
+                    height:
+                        placement.config.size.rows * _rowHeight +
+                        (placement.config.size.rows - 1) * _gap,
+                    child: _DashboardTile(
+                      config: placement.config,
+                      width: double.infinity,
+                      height: double.infinity,
+                      editing: editing,
+                      reduceMotion: reduceMotion,
+                      onRequestEdit: onRequestEdit,
+                      onMove: onMove,
+                      onResize: onResize,
+                      onHide: onHide,
+                      child:
+                          children[placement.config.id] ??
+                          const SizedBox.shrink(),
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
     );
   }
+
+  List<_DashboardPlacement> _placeTiles(
+    List<TodayTileConfig> tiles,
+    int columnCount,
+  ) {
+    final occupied = <List<bool>>[];
+    final placements = <_DashboardPlacement>[];
+
+    for (final tile in tiles) {
+      final width = math.min(tile.size.columns, columnCount);
+      final height = tile.size.rows;
+      var row = 0;
+      var placed = false;
+      while (!placed) {
+        while (occupied.length < row + height) {
+          occupied.add(List.filled(columnCount, false));
+        }
+        for (var column = 0; column <= columnCount - width; column++) {
+          var available = true;
+          for (var y = row; y < row + height && available; y++) {
+            for (var x = column; x < column + width; x++) {
+              if (occupied[y][x]) {
+                available = false;
+                break;
+              }
+            }
+          }
+          if (!available) continue;
+          for (var y = row; y < row + height; y++) {
+            for (var x = column; x < column + width; x++) {
+              occupied[y][x] = true;
+            }
+          }
+          placements.add(
+            _DashboardPlacement(config: tile, column: column, row: row),
+          );
+          placed = true;
+          break;
+        }
+        if (!placed) row++;
+      }
+    }
+    return placements;
+  }
+}
+
+class _DashboardPlacement {
+  const _DashboardPlacement({
+    required this.config,
+    required this.column,
+    required this.row,
+  });
+
+  final TodayTileConfig config;
+  final int column;
+  final int row;
 }
 
 class _DashboardTile extends StatefulWidget {
@@ -85,7 +165,6 @@ class _DashboardTile extends StatefulWidget {
     required this.onResize,
     required this.onHide,
     required this.child,
-    super.key,
   });
 
   final TodayTileConfig config;

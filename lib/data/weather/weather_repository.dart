@@ -4,9 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 
 class WeatherRepository {
-  const WeatherRepository({this._client});
+  const WeatherRepository({this.httpClient});
 
-  final http.Client? _client;
+  final http.Client? httpClient;
 
   Future<WeatherSnapshot> fetch({
     required double latitude,
@@ -21,9 +21,9 @@ class WeatherRepository {
       'forecast_days': '16',
       'timezone': 'auto',
     });
-    final client = _client ?? http.Client();
+    final requestClient = httpClient ?? http.Client();
     try {
-      final response = await client
+      final response = await requestClient
           .get(uri)
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
@@ -42,21 +42,22 @@ class WeatherRepository {
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
         timezone: json['timezone'] as String,
-        currentTemperature: (current['temperature_2m'] as num).toDouble(),
-        currentWeatherCode: current['weather_code'] as int,
+        currentTemperature:
+            (current['temperature_2m'] as num?)?.toDouble() ?? 0,
+        currentWeatherCode: (current['weather_code'] as num?)?.toInt() ?? 0,
         fetchedAt: DateTime.now(),
         daily: List.generate(dates.length, (index) {
           return DailyWeather(
             dateKey: dates[index] as String,
-            weatherCode: codes[index] as int,
-            temperatureMax: (highs[index] as num).toDouble(),
-            temperatureMin: (lows[index] as num).toDouble(),
-            precipitationProbability: precipitation?[index] as int?,
+            weatherCode: (codes[index] as num?)?.toInt() ?? 0,
+            temperatureMax: (highs[index] as num?)?.toDouble() ?? 0,
+            temperatureMin: (lows[index] as num?)?.toDouble() ?? 0,
+            precipitationProbability: (precipitation?[index] as num?)?.toInt(),
           );
         }),
       );
     } finally {
-      if (_client == null) client.close();
+      if (httpClient == null) requestClient.close();
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yotsuba_schedule/app/app.dart';
+import 'package:yotsuba_schedule/app/router.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 
 void main() {
@@ -20,6 +21,7 @@ void main() {
       'weather.autoRequest.v1': true,
     });
     preferences = await SharedPreferences.getInstance();
+    appRouter.go('/');
   });
 
   Widget testApp() => ProviderScope(
@@ -47,5 +49,23 @@ void main() {
 
     expect(find.textContaining('周'), findsWidgets);
     expect(find.text('移动应用开发'), findsOneWidget);
+  });
+
+  testWidgets('keeps the today dashboard in two columns at 320px', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(testApp());
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final tasks = tester.getTopLeft(find.text('还要做什么'));
+    final courseWork = tester.getTopLeft(find.text('临近截止'));
+    expect((tasks.dy - courseWork.dy).abs(), lessThan(8));
+    expect(courseWork.dx, greaterThan(tasks.dx));
+    expect(tester.takeException(), isNull);
   });
 }

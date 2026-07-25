@@ -105,9 +105,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                   weather: weather,
                   reduceMotion: settings.reduceMotion,
                   onSelectWeek: () => _showWeekPicker(schedule, controller),
-                  onWeather: () => ref
-                      .read(weatherControllerProvider.notifier)
-                      .requestLocation(),
+                  onWeather: _requestWeather,
                   onManage: () => showDataManagementSheet(context),
                   weekGuideKey: _weekGuideKey,
                   weatherGuideKey: _weatherGuideKey,
@@ -356,6 +354,21 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       WeatherStatus.error => '天气暂时不可用，点击顶部天气按钮可重试',
       WeatherStatus.ready => '该日期尚未进入未来预报范围',
     };
+  }
+
+  Future<void> _requestWeather() async {
+    final controller = ref.read(weatherControllerProvider.notifier);
+    final status = await controller.requestLocation();
+    if (!mounted || status == WeatherStatus.ready) return;
+    final locationMessage = ref.read(weatherControllerProvider).message;
+    final fallbackStatus = await controller.useCampusWeather();
+    if (!mounted) return;
+    final message = fallbackStatus == WeatherStatus.ready
+        ? '$locationMessage，已显示学校附近天气'
+        : ref.read(weatherControllerProvider).message;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _showWeekPicker(

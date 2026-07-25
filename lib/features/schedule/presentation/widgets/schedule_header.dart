@@ -37,9 +37,13 @@ class ScheduleHeader extends StatelessWidget {
     final presentation = snapshot == null
         ? null
         : weatherPresentation(snapshot.currentWeatherCode);
+    final compact = MediaQuery.sizeOf(context).width < 360;
     return Container(
       height: 104,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: 13,
+      ),
       decoration: BoxDecoration(
         color: palette.surface.withValues(alpha: 0.88),
         border: Border(bottom: BorderSide(color: palette.border)),
@@ -71,7 +75,7 @@ class ScheduleHeader extends StatelessWidget {
                           '第 $week 周',
                           style: TextStyle(
                             height: 1,
-                            fontSize: 34,
+                            fontSize: compact ? 30 : 34,
                             fontWeight: FontWeight.w800,
                             color: palette.text,
                           ),
@@ -92,6 +96,7 @@ class ScheduleHeader extends StatelessWidget {
           KeyedSubtree(
             key: weatherGuideKey,
             child: _HeaderButton(
+              compact: compact,
               label: snapshot == null
                   ? '获取当前位置天气'
                   : '${presentation!.label} ${snapshot.currentTemperature.round()}度',
@@ -136,10 +141,11 @@ class ScheduleHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: compact ? 6 : 10),
           KeyedSubtree(
             key: dataGuideKey,
             child: _HeaderButton(
+              compact: compact,
               label: '打开本地数据管理',
               onTap: onManage,
               child: Icon(
@@ -160,11 +166,13 @@ class _HeaderButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     required this.child,
+    required this.compact,
   });
 
   final String label;
   final VoidCallback onTap;
   final Widget child;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -176,9 +184,9 @@ class _HeaderButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minWidth: 48),
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          constraints: BoxConstraints(minWidth: compact ? 42 : 48),
+          height: compact ? 46 : 50,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
           decoration: BoxDecoration(
             color: palette.surfaceRaised.withValues(alpha: 0.9),
             border: Border.all(color: palette.border),
