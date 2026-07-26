@@ -1,0 +1,23 @@
+name: yotsuba_schedule_kit
+description: >-
+  Class-schedule widgets with Chinese academic-term semantics (odd/even weeks,
+  makeup days, overlaps) and a signature wave-cover week transition that never
+  shows an empty frame. Flutter twin of the @iyotsuba/schedule-* npm kit.
+version: 0.1.0
+homepage: https://isla4ever.github.io/yotsuba-kit/
+repository: https://github.com/isla4ever/yotsuba-schedule
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
