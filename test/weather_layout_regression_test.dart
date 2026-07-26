@@ -320,4 +320,97 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'full-width tile is one drop region and bottom handle only changes height',
+    (tester) async {
+      TodayTileId? movedId;
+      int? movedIndex;
+      TodayTileId? resizedId;
+      TodayTileSize? resizedSize;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 320,
+                child: TodayDashboardGrid(
+                  layout: const [
+                    TodayTileConfig(
+                      id: TodayTileId.tasks,
+                      size: TodayTileSize.oneByOne,
+                    ),
+                    TodayTileConfig(
+                      id: TodayTileId.courseWork,
+                      size: TodayTileSize.oneByOne,
+                    ),
+                    TodayTileConfig(
+                      id: TodayTileId.materials,
+                      size: TodayTileSize.twoByOne,
+                    ),
+                  ],
+                  editing: true,
+                  reduceMotion: true,
+                  onRequestEdit: () {},
+                  onReorder: (id, index) {
+                    movedId = id;
+                    movedIndex = index;
+                  },
+                  onResize: (id, size) {
+                    resizedId = id;
+                    resizedSize = size;
+                  },
+                  onHide: (_) {},
+                  children: {
+                    TodayTileId.tasks: (_) =>
+                        const ColoredBox(color: Color(0xFFEFF4FF)),
+                    TodayTileId.courseWork: (_) =>
+                        const ColoredBox(color: Color(0xFFFFF4EA)),
+                    TodayTileId.materials: (_) =>
+                        const ColoredBox(color: Color(0xFFF0F6EE)),
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final taskTile = find.byKey(const ValueKey(TodayTileId.tasks));
+      final materialsTile = find.byKey(const ValueKey(TodayTileId.materials));
+      final materialsRect = tester.getRect(materialsTile);
+      final drag = await tester.startGesture(tester.getCenter(taskTile));
+      await tester.pump(const Duration(milliseconds: 140));
+      await drag.moveTo(
+        Offset(materialsRect.right - 12, materialsRect.top + 30),
+      );
+      await tester.pump();
+      await drag.up();
+      await tester.pump();
+
+      expect(movedId, TodayTileId.tasks);
+      expect(movedIndex, 1);
+
+      final heightHandle = find.descendant(
+        of: taskTile,
+        matching: find.bySemanticsLabel('上下拖动调整组件高度'),
+      );
+      expect(heightHandle, findsOneWidget);
+      final resize = await tester.startGesture(tester.getCenter(heightHandle));
+      await resize.moveBy(const Offset(0, 34));
+      await tester.pump();
+      await resize.moveBy(const Offset(0, 34));
+      await tester.pump();
+      await resize.up();
+      await tester.pump();
+
+      expect(resizedId, TodayTileId.tasks);
+      expect(resizedSize, TodayTileSize.oneByTwo);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

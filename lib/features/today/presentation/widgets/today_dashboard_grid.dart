@@ -16,6 +16,7 @@ class TodayDashboardGrid extends StatefulWidget {
     required this.onReorder,
     required this.onResize,
     required this.onHide,
+    this.tourKeys = const {},
     super.key,
   });
 
@@ -27,6 +28,7 @@ class TodayDashboardGrid extends StatefulWidget {
   final void Function(TodayTileId moving, int visibleIndex) onReorder;
   final void Function(TodayTileId id, TodayTileSize size) onResize;
   final ValueChanged<TodayTileId> onHide;
+  final Map<TodayTileId, GlobalKey> tourKeys;
 
   @override
   State<TodayDashboardGrid> createState() => _TodayDashboardGridState();
@@ -40,6 +42,8 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
   final Map<TodayTileId, TodayTileSize> _previewSizes = {};
   TodayTileId? _draggingId;
   int? _dropIndex;
+  List<TodayTileId>? _dragBaseOrder;
+  final _dropLayerKey = GlobalKey();
 
   @override
   void didUpdateWidget(covariant TodayDashboardGrid oldWidget) {
@@ -49,6 +53,7 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
       _previewSizes.clear();
       _draggingId = null;
       _dropIndex = null;
+      _dragBaseOrder = null;
     }
   }
 
@@ -63,7 +68,8 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
             : constraints.maxWidth;
         final visible = _visibleConfigs();
         final placements = _placeTiles(visible, columnCount);
-        final occupiedRows = placements.fold<int>(
+        final referencePlacements = _dragReferencePlacements(columnCount);
+        final occupiedRows = [...placements, ...referencePlacements].fold<int>(
           0,
           (maximum, item) =>
               math.max(maximum, item.row + item.config.size.rows),
@@ -78,16 +84,6 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              if (_draggingId != null)
-                for (var row = 0; row < displayRows; row++)
-                  for (var column = 0; column < columnCount; column++)
-                    _buildDropCell(
-                      row: row,
-                      column: column,
-                      columnWidth: columnWidth,
-                      placements: placements,
-                      columnCount: columnCount,
-                    ),
               for (final placement in placements)
                 AnimatedPositioned(
                   key: ValueKey(placement.config.id),
@@ -103,7 +99,14 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
                   height:
                       placement.config.size.rows * _rowHeight +
                       (placement.config.size.rows - 1) * _gap,
-                  child: _buildTile(placement),
+                  child: _buildTile(placement, columnWidth),
+                ),
+              if (_draggingId != null)
+                _buildDropLayer(
+                  placements: referencePlacements,
+                  columnWidth: columnWidth,
+                  columnCount: columnCount,
+                  totalHeight: totalHeight,
                 ),
             ],
           ),
@@ -120,76 +123,127 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
     );
   }
 
-  Widget _buildTile(_DashboardPlacement placement) {
+  Widget _buildTile(_DashboardPlacement placement, double columnWidth) {
     final config = placement.config;
-    return DragTarget<TodayTileId>(
-      onWillAcceptWithDetails: (_) => true,
-      onMove: (details) {
-        if (details.data != config.id) {
-          _previewBefore(details.data, config.id);
-        }
-      },
-      onAcceptWithDetails: (details) => _commitDrag(details.data),
-      builder: (context, candidates, _) {
-        return _DashboardTile(
-          config: config,
-          editing: widget.editing,
-          reduceMotion: widget.reduceMotion,
-          dropHighlighted: candidates.isNotEmpty,
-          onRequestEdit: widget.onRequestEdit,
-          onDragStarted: () => _beginDrag(config.id),
-          onDragEnded: _finishDrag,
-          onResizePreview: (size) => _previewResize(config.id, size),
-          onResizeCommit: (size) => _commitResize(config.id, size),
-          onResizeCancel: () => _cancelResize(config.id),
-          onHide: () => widget.onHide(config.id),
-          child:
-              widget.children[config.id]?.call(config.size) ??
-              const SizedBox.shrink(),
-        );
-      },
+    return KeyedSubtree(
+      key: widget.tourKeys[config.id],
+      child: _DashboardTile(
+        config: config,
+        editing: widget.editing,
+        reduceMotion: widget.reduceMotion,
+        horizontalResizeThreshold: math.min(columnWidth * 0.24, 36),
+        verticalResizeThreshold: 32,
+        dropHighlighted: false,
+        onRequestEdit: widget.onRequestEdit,
+        onDragStarted: () => _beginDrag(config.id),
+        onDragEnded: _finishDrag,
+        onResizePreview: (size) => _previewResize(config.id, size),
+        onResizeCommit: (size) => _commitResize(config.id, size),
+        onResizeCancel: () => _cancelResize(config.id),
+        onHide: () => widget.onHide(config.id),
+        child:
+            widget.children[config.id]?.call(config.size) ??
+            const SizedBox.shrink(),
+      ),
     );
   }
 
-  Widget _buildDropCell({
-    required int row,
-    required int column,
-    required double columnWidth,
+  Widget _buildDropLayer({
     required List<_DashboardPlacement> placements,
+    required double columnWidth,
     required int columnCount,
+    required double totalHeight,
   }) {
-    final targetIndex = _indexForSlot(row, column, placements, columnCount);
-    return Positioned(
-      left: column * (columnWidth + _gap),
-      top: row * (_rowHeight + _gap),
-      width: columnWidth,
-      height: _rowHeight,
+    final indicatorTop = _dropIndicatorTop(_dropIndex, placements, totalHeight);
+    return Positioned.fill(
       child: DragTarget<TodayTileId>(
+        key: _dropLayerKey,
         onWillAcceptWithDetails: (_) => true,
-        onMove: (details) => _previewAt(details.data, targetIndex),
+        onMove: (details) => _previewFromGlobalOffset(
+          details.data,
+          details.offset,
+          placements,
+          columnWidth,
+          columnCount,
+        ),
         onAcceptWithDetails: (details) => _commitDrag(details.data),
         builder: (context, candidates, _) {
-          final highlighted =
-              candidates.isNotEmpty || _dropIndex == targetIndex;
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            margin: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: highlighted
-                  ? context.palette.scheduleAccentSoft.withValues(alpha: 0.48)
-                  : Colors.transparent,
-              border: Border.all(
-                color: highlighted
-                    ? context.palette.scheduleAccent.withValues(alpha: 0.62)
-                    : Colors.transparent,
-                width: 1.5,
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: ColoredBox(
+                  color: candidates.isNotEmpty
+                      ? context.palette.scheduleAccentSoft.withValues(
+                          alpha: 0.05,
+                        )
+                      : Colors.transparent,
+                ),
               ),
-              borderRadius: BorderRadius.circular(8),
-            ),
+              AnimatedPositioned(
+                duration: widget.reduceMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                top: indicatorTop,
+                left: 8,
+                right: 8,
+                height: 4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.palette.scheduleAccent,
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: context.palette.scheduleAccent.withValues(
+                          alpha: 0.24,
+                        ),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
     );
+  }
+
+  void _previewFromGlobalOffset(
+    TodayTileId moving,
+    Offset globalOffset,
+    List<_DashboardPlacement> placements,
+    double columnWidth,
+    int columnCount,
+  ) {
+    final renderObject = _dropLayerKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    final point = renderObject.globalToLocal(globalOffset);
+    final targetIndex = _indexForPoint(
+      point,
+      placements,
+      columnWidth,
+      columnCount,
+    );
+    _previewAt(moving, targetIndex);
+  }
+
+  double _dropIndicatorTop(
+    int? index,
+    List<_DashboardPlacement> placements,
+    double totalHeight,
+  ) {
+    if (placements.isEmpty || index == null || index <= 0) return 2;
+    if (index >= placements.length) {
+      final last = placements.last;
+      final bottom =
+          (last.row + last.config.size.rows) * _rowHeight +
+          (last.row + last.config.size.rows - 1) * _gap;
+      return math.min(totalHeight - 4, bottom + _gap / 2 - 2);
+    }
+    return math.max(2, placements[index].row * (_rowHeight + _gap) - _gap / 2);
   }
 
   List<TodayTileConfig> _visibleConfigs() {
@@ -246,26 +300,73 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
     return placements;
   }
 
-  int _indexForSlot(
-    int row,
-    int column,
+  List<_DashboardPlacement> _dragReferencePlacements(int columnCount) {
+    final moving = _draggingId;
+    final order = _dragBaseOrder;
+    if (moving == null || order == null) return const [];
+    final byId = {
+      for (final item in widget.layout.where((item) => item.visible))
+        item.id: item,
+    };
+    final tiles = order
+        .where((id) => id != moving)
+        .map((id) => byId[id])
+        .whereType<TodayTileConfig>()
+        .toList();
+    return _placeTiles(tiles, columnCount);
+  }
+
+  int _indexForPoint(
+    Offset point,
     List<_DashboardPlacement> placements,
+    double columnWidth,
     int columnCount,
   ) {
-    final moving = _draggingId;
-    final remaining = (_previewOrder ?? const <TodayTileId>[])
-        .where((id) => id != moving)
-        .toList();
-    final slot = row * columnCount + column;
-    for (final placement in placements) {
-      if (placement.config.id == moving) continue;
-      final placementSlot = placement.row * columnCount + placement.column;
-      if (placementSlot >= slot) {
-        final index = remaining.indexOf(placement.config.id);
-        if (index >= 0) return index;
+    final targets = <({int index, _DashboardPlacement placement, Rect rect})>[];
+    for (var index = 0; index < placements.length; index++) {
+      final placement = placements[index];
+      final columns = math.min(placement.config.size.columns, columnCount);
+      final left = placement.column * (columnWidth + _gap);
+      final top = placement.row * (_rowHeight + _gap);
+      final width = columns * columnWidth + (columns - 1) * _gap;
+      final height =
+          placement.config.size.rows * _rowHeight +
+          (placement.config.size.rows - 1) * _gap;
+      targets.add((
+        index: index,
+        placement: placement,
+        rect: Rect.fromLTWH(left, top, width, height),
+      ));
+    }
+
+    for (final target in targets) {
+      if (!target.rect.contains(point)) continue;
+      final columns = math.min(
+        target.placement.config.size.columns,
+        columnCount,
+      );
+      if (columns == columnCount || target.placement.config.size.rows > 1) {
+        return point.dy <= target.rect.center.dy
+            ? target.index
+            : target.index + 1;
+      }
+      return point.dx <= target.rect.center.dx
+          ? target.index
+          : target.index + 1;
+    }
+
+    final spatialTargets = [...targets]
+      ..sort((a, b) {
+        final vertical = a.rect.top.compareTo(b.rect.top);
+        return vertical != 0 ? vertical : a.rect.left.compareTo(b.rect.left);
+      });
+    for (final target in spatialTargets) {
+      if (point.dy < target.rect.top ||
+          (point.dy <= target.rect.bottom && point.dx < target.rect.left)) {
+        return target.index;
       }
     }
-    return remaining.length;
+    return placements.length;
   }
 
   void _beginDrag(TodayTileId id) {
@@ -275,19 +376,13 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
           .where((item) => item.visible)
           .map((item) => item.id)
           .toList();
+      _dragBaseOrder = List.of(_previewOrder!);
       _dropIndex = _previewOrder!.indexOf(id);
     });
   }
 
-  void _previewBefore(TodayTileId moving, TodayTileId target) {
-    final remaining = [...?_previewOrder]..remove(moving);
-    final targetIndex = remaining.indexOf(target);
-    if (targetIndex < 0) return;
-    _setPreview(moving, targetIndex, remaining);
-  }
-
   void _previewAt(TodayTileId moving, int targetIndex) {
-    final remaining = [...?_previewOrder]..remove(moving);
+    final remaining = [...?_dragBaseOrder]..remove(moving);
     _setPreview(moving, targetIndex, remaining);
   }
 
@@ -321,6 +416,7 @@ class _TodayDashboardGridState extends State<TodayDashboardGrid> {
       _draggingId = null;
       _previewOrder = null;
       _dropIndex = null;
+      _dragBaseOrder = null;
     });
   }
 
@@ -366,6 +462,8 @@ class _DashboardTile extends StatefulWidget {
     required this.config,
     required this.editing,
     required this.reduceMotion,
+    required this.horizontalResizeThreshold,
+    required this.verticalResizeThreshold,
     required this.dropHighlighted,
     required this.onRequestEdit,
     required this.onDragStarted,
@@ -380,6 +478,8 @@ class _DashboardTile extends StatefulWidget {
   final TodayTileConfig config;
   final bool editing;
   final bool reduceMotion;
+  final double horizontalResizeThreshold;
+  final double verticalResizeThreshold;
   final bool dropHighlighted;
   final VoidCallback onRequestEdit;
   final VoidCallback onDragStarted;
@@ -470,6 +570,13 @@ class _DashboardTileState extends State<_DashboardTile> {
                 onEnd: _endResize,
                 onCancel: widget.onResizeCancel,
               ),
+            _HeightResizeHandle(
+              onStart: () => _startResize(_ResizeCorner.southeast),
+              onUpdate: (delta) =>
+                  _updateResize(_ResizeCorner.southeast, Offset(0, delta)),
+              onEnd: _endResize,
+              onCancel: widget.onResizeCancel,
+            ),
           ],
         ],
       ),
@@ -515,14 +622,14 @@ class _DashboardTileState extends State<_DashboardTile> {
           _ResizeCorner.southwest || _ResizeCorner.southeast => 1,
           _ => -1,
         };
-    final columns = horizontal > 24
+    final columns = horizontal > widget.horizontalResizeThreshold
         ? 2
-        : horizontal < -24
+        : horizontal < -widget.horizontalResizeThreshold
         ? 1
         : _resizeOrigin.columns;
-    final rows = vertical > 24
+    final rows = vertical > widget.verticalResizeThreshold
         ? 2
-        : vertical < -24
+        : vertical < -widget.verticalResizeThreshold
         ? 1
         : _resizeOrigin.rows;
     final next = TodayTileSize.values.firstWhere(
@@ -534,6 +641,62 @@ class _DashboardTileState extends State<_DashboardTile> {
   }
 
   void _endResize() => widget.onResizeCommit(_resizeCurrent);
+}
+
+class _HeightResizeHandle extends StatelessWidget {
+  const _HeightResizeHandle({
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
+    required this.onCancel,
+  });
+
+  final VoidCallback onStart;
+  final ValueChanged<double> onUpdate;
+  final VoidCallback onEnd;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Positioned(
+      right: 48,
+      bottom: -5,
+      left: 48,
+      height: 32,
+      child: Semantics(
+        label: '上下拖动调整组件高度',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragStart: (_) => onStart(),
+          onVerticalDragUpdate: (details) => onUpdate(details.delta.dy),
+          onVerticalDragEnd: (_) => onEnd(),
+          onVerticalDragCancel: onCancel,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: 46,
+              height: 6,
+              decoration: BoxDecoration(
+                color: palette.surface,
+                border: Border.all(
+                  color: palette.scheduleAccent.withValues(alpha: 0.5),
+                ),
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.shadow,
+                    blurRadius: 7,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ResizeHandle extends StatelessWidget {

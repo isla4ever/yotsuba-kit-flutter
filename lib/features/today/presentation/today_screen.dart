@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
+import 'package:yotsuba_schedule/features/onboarding/application/today_onboarding_controller.dart';
+import 'package:yotsuba_schedule/features/onboarding/presentation/spotlight_tour.dart';
 import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/planning/course_plan_completion_dialog.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/planning/course_plan_sheet.dart';
@@ -29,6 +31,19 @@ class TodayScreen extends ConsumerStatefulWidget {
 
 class _TodayScreenState extends ConsumerState<TodayScreen> {
   bool _editingLayout = false;
+  final _weatherGuideKey = GlobalKey();
+  final _commandGuideKey = GlobalKey();
+  final _tasksGuideKey = GlobalKey();
+  final _layoutGuideKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(todayOnboardingProvider.notifier).startIfNeeded();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +52,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final settings = ref.watch(appSettingsProvider);
     final weather = ref.watch(weatherControllerProvider);
     final layout = ref.watch(todayLayoutProvider);
+    final onboarding = ref.watch(todayOnboardingProvider);
     final controller = ref.read(scheduleControllerProvider.notifier);
     final dateLabel = DateFormat('M月d日 · EEEE', 'zh_CN').format(viewModel.now);
     final greeting = switch (viewModel.now.hour) {
@@ -53,136 +69,190 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       kind: sceneKind,
       reduceMotion: settings.reduceMotion,
       intensity: 0.9,
-      child: SafeArea(
-        bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              key: const PageStorageKey('today-scroll'),
-              padding: EdgeInsets.fromLTRB(
-                constraints.maxWidth < 360 ? 12 : 18,
-                14,
-                constraints.maxWidth < 360 ? 12 : 18,
-                24,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 920),
-                  child: Column(
-                    children: [
-                      _TodayHeading(
-                        greeting: greeting,
-                        dateLabel: dateLabel,
-                        weather: weather,
-                        reduceMotion: settings.reduceMotion,
-                        onWeatherTap: _requestWeather,
-                      ),
-                      AnimatedSwitcher(
-                        duration: settings.reduceMotion
-                            ? Duration.zero
-                            : const Duration(milliseconds: 280),
-                        child: _editingLayout
-                            ? _TodayLayoutToolbar(
-                                key: const ValueKey('layout-toolbar'),
-                                onDone: () =>
-                                    setState(() => _editingLayout = false),
-                                onManage: _showWidgetManager,
-                                onReset: () => ref
-                                    .read(todayLayoutProvider.notifier)
-                                    .reset(),
-                              )
-                            : const SizedBox.shrink(
-                                key: ValueKey('layout-toolbar-empty'),
-                              ),
-                      ),
-                      SizedBox(height: _editingLayout ? 12 : 6),
-                      TodayDashboardGrid(
-                        layout: layout,
-                        editing: _editingLayout,
-                        reduceMotion: settings.reduceMotion,
-                        onRequestEdit: () =>
-                            setState(() => _editingLayout = true),
-                        onReorder: (moving, visibleIndex) => ref
-                            .read(todayLayoutProvider.notifier)
-                            .moveToVisibleIndex(moving, visibleIndex),
-                        onResize: (id, size) => ref
-                            .read(todayLayoutProvider.notifier)
-                            .setSize(id, size),
-                        onHide: (id) => ref
-                            .read(todayLayoutProvider.notifier)
-                            .setVisible(id, false),
-                        children: {
-                          TodayTileId.command: (size) => TodayCommandSummary(
-                            size: size,
-                            viewModel: viewModel,
-                            weatherHint: _weatherHint(weather, viewModel.now),
-                          ),
-                          TodayTileId.timeline: (size) => TodayCourseTimeline(
-                            size: size,
-                            courses: viewModel.courses,
-                            onOpenSchedule: () => context.go('/schedule'),
-                          ),
-                          TodayTileId.tasks: (size) => TodayTaskPanel(
-                            size: size,
-                            tasks: viewModel.dayTasks,
-                            onAdd: () => showDayPlannerSheet(
-                              context,
-                              date: viewModel.now,
-                            ),
-                            onToggle: controller.toggleDayTask,
-                          ),
-                          TodayTileId.courseWork: (size) =>
-                              TodayCourseWorkPanel(
-                                size: size,
-                                plans: viewModel.coursePlans,
-                                courses: schedule.courses,
-                                onToggle: (plan) async {
-                                  if (!plan.completed &&
-                                      !await confirmCoursePlanCompletion(
-                                        context,
-                                        plan,
-                                      )) {
-                                    return;
-                                  }
-                                  controller.setCoursePlanCompleted(
-                                    plan.id,
-                                    !plan.completed,
-                                  );
-                                },
-                                onOpen: (plan) {
-                                  final course = schedule.courses
-                                      .where((item) => item.id == plan.courseId)
-                                      .firstOrNull;
-                                  if (course != null) {
-                                    showCoursePlanSheet(
-                                      context,
-                                      course: course,
-                                    );
-                                  }
-                                },
-                              ),
-                          TodayTileId.materials: (size) => TodayMaterialsPanel(
-                            size: size,
-                            materials: [
-                              for (final item in viewModel.courses)
-                                if (item.course.materials.isNotEmpty)
-                                  (item.course, item.course.materials),
-                            ],
-                            onOpenCourse: (course) => showCourseMaterialsSheet(
-                              context,
-                              course: course,
-                            ),
-                            onEmptyTap: () => context.go('/schedule'),
-                          ),
-                        },
-                      ),
-                    ],
+      child: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  key: const PageStorageKey('today-scroll'),
+                  padding: EdgeInsets.fromLTRB(
+                    constraints.maxWidth < 360 ? 12 : 18,
+                    14,
+                    constraints.maxWidth < 360 ? 12 : 18,
+                    24,
                   ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 920),
+                      child: Column(
+                        children: [
+                          _TodayHeading(
+                            greeting: greeting,
+                            dateLabel: dateLabel,
+                            weather: weather,
+                            reduceMotion: settings.reduceMotion,
+                            onWeatherTap: _requestWeather,
+                            onEditLayout: () =>
+                                setState(() => _editingLayout = true),
+                            weatherKey: _weatherGuideKey,
+                            layoutKey: _layoutGuideKey,
+                          ),
+                          AnimatedSwitcher(
+                            duration: settings.reduceMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 280),
+                            child: _editingLayout
+                                ? _TodayLayoutToolbar(
+                                    key: const ValueKey('layout-toolbar'),
+                                    onDone: () =>
+                                        setState(() => _editingLayout = false),
+                                    onManage: _showWidgetManager,
+                                    onGuide: () => ref
+                                        .read(todayOnboardingProvider.notifier)
+                                        .replay(),
+                                    onReset: () => ref
+                                        .read(todayLayoutProvider.notifier)
+                                        .reset(),
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('layout-toolbar-empty'),
+                                  ),
+                          ),
+                          SizedBox(height: _editingLayout ? 12 : 6),
+                          TodayDashboardGrid(
+                            layout: layout,
+                            editing: _editingLayout,
+                            reduceMotion: settings.reduceMotion,
+                            onRequestEdit: () =>
+                                setState(() => _editingLayout = true),
+                            onReorder: (moving, visibleIndex) => ref
+                                .read(todayLayoutProvider.notifier)
+                                .moveToVisibleIndex(moving, visibleIndex),
+                            onResize: (id, size) => ref
+                                .read(todayLayoutProvider.notifier)
+                                .setSize(id, size),
+                            onHide: (id) => ref
+                                .read(todayLayoutProvider.notifier)
+                                .setVisible(id, false),
+                            tourKeys: {
+                              TodayTileId.command: _commandGuideKey,
+                              TodayTileId.tasks: _tasksGuideKey,
+                            },
+                            children: {
+                              TodayTileId.command: (size) =>
+                                  TodayCommandSummary(
+                                    size: size,
+                                    viewModel: viewModel,
+                                    weatherHint: _weatherHint(
+                                      weather,
+                                      viewModel.now,
+                                    ),
+                                  ),
+                              TodayTileId.timeline: (size) =>
+                                  TodayCourseTimeline(
+                                    size: size,
+                                    courses: viewModel.courses,
+                                    onOpenSchedule: () =>
+                                        context.go('/schedule'),
+                                  ),
+                              TodayTileId.tasks: (size) => TodayTaskPanel(
+                                size: size,
+                                tasks: viewModel.dayTasks,
+                                onAdd: () => showDayPlannerSheet(
+                                  context,
+                                  date: viewModel.now,
+                                ),
+                                onToggle: controller.toggleDayTask,
+                              ),
+                              TodayTileId.courseWork: (size) =>
+                                  TodayCourseWorkPanel(
+                                    size: size,
+                                    plans: viewModel.coursePlans,
+                                    courses: schedule.courses,
+                                    onToggle: (plan) async {
+                                      if (!plan.completed &&
+                                          !await confirmCoursePlanCompletion(
+                                            context,
+                                            plan,
+                                          )) {
+                                        return;
+                                      }
+                                      controller.setCoursePlanCompleted(
+                                        plan.id,
+                                        !plan.completed,
+                                      );
+                                    },
+                                    onOpen: (plan) {
+                                      final course = schedule.courses
+                                          .where(
+                                            (item) => item.id == plan.courseId,
+                                          )
+                                          .firstOrNull;
+                                      if (course != null) {
+                                        showCoursePlanSheet(
+                                          context,
+                                          course: course,
+                                        );
+                                      }
+                                    },
+                                  ),
+                              TodayTileId.materials: (size) =>
+                                  TodayMaterialsPanel(
+                                    size: size,
+                                    materials: [
+                                      for (final item in viewModel.courses)
+                                        if (item.course.materials.isNotEmpty)
+                                          (item.course, item.course.materials),
+                                    ],
+                                    onOpenCourse: (course) =>
+                                        showCourseMaterialsSheet(
+                                          context,
+                                          course: course,
+                                        ),
+                                    onEmptyTap: () => context.go('/schedule'),
+                                  ),
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (onboarding.active)
+            SpotlightTour(
+              key: ValueKey(onboarding.requestId),
+              reduceMotion: settings.reduceMotion,
+              onFinish: () =>
+                  ref.read(todayOnboardingProvider.notifier).finish(),
+              steps: [
+                SpotlightStep(
+                  target: _weatherGuideKey,
+                  title: '天气与课程联动',
+                  body: '点击获取当前位置天气，今日提示、课程出行建议和页面氛围会一起更新。',
                 ),
-              ),
-            );
-          },
-        ),
+                SpotlightStep(
+                  target: _commandGuideKey,
+                  title: '先看今天还剩多少',
+                  body: '课程概览集中显示下一节课、剩余门数、还需上课时长和当天进度。',
+                ),
+                SpotlightStep(
+                  target: _tasksGuideKey,
+                  title: '待办与课程作业分开管理',
+                  body: '当天待办记录临时事项；课程作业保留课程关联、截止时间和完成记录。',
+                ),
+                SpotlightStep(
+                  target: _layoutGuideKey,
+                  title: '像桌面小组件一样排版',
+                  body: '进入布局模式后可拖动整张卡片，其他组件会自动让位；拖动四角改宽高，拖动下边缘只调高度。',
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -274,38 +344,55 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       context: context,
       useRootNavigator: true,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => Consumer(
         builder: (context, ref, _) {
           final layout = ref.watch(todayLayoutProvider);
           return SafeArea(
             top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('管理今日组件', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 6),
-                  Text(
-                    '显示需要的信息，回到看板后可拖动排序和右下角调整尺寸。',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.palette.textSoft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '管理今日组件',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  for (final item in layout)
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(_tileLabel(item.id)),
-                      subtitle: Text('当前尺寸 ${item.size.label}'),
-                      value: item.visible,
-                      onChanged: (value) => ref
-                          .read(todayLayoutProvider.notifier)
-                          .setVisible(item.id, value),
+                    const SizedBox(height: 6),
+                    Text(
+                      '显示需要的信息，并直接选择紧凑、加高或通栏布局。',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.palette.textSoft,
+                      ),
                     ),
-                ],
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: layout.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final item = layout[index];
+                          return _WidgetManagerItem(
+                            config: item,
+                            onVisibleChanged: (value) => ref
+                                .read(todayLayoutProvider.notifier)
+                                .setVisible(item.id, value),
+                            onSizeChanged: (size) => ref
+                                .read(todayLayoutProvider.notifier)
+                                .setSize(item.id, size),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -320,12 +407,14 @@ class _TodayLayoutToolbar extends StatelessWidget {
     required this.onDone,
     required this.onManage,
     required this.onReset,
+    required this.onGuide,
     super.key,
   });
 
   final VoidCallback onDone;
   final VoidCallback onManage;
   final VoidCallback onReset;
+  final VoidCallback onGuide;
 
   @override
   Widget build(BuildContext context) {
@@ -347,10 +436,16 @@ class _TodayLayoutToolbar extends StatelessWidget {
           const SizedBox(width: 7),
           const Expanded(
             child: Text(
-              '布局',
+              '拖动换位 · 下边缘调高度',
               maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
+          ),
+          IconButton(
+            tooltip: '查看布局操作指引',
+            onPressed: onGuide,
+            icon: const Icon(Icons.help_outline_rounded, size: 19),
           ),
           IconButton(
             tooltip: '管理组件',
@@ -376,6 +471,9 @@ class _TodayHeading extends StatelessWidget {
     required this.weather,
     required this.reduceMotion,
     required this.onWeatherTap,
+    required this.onEditLayout,
+    required this.weatherKey,
+    required this.layoutKey,
   });
 
   final String greeting;
@@ -383,6 +481,9 @@ class _TodayHeading extends StatelessWidget {
   final WeatherState weather;
   final bool reduceMotion;
   final VoidCallback onWeatherTap;
+  final VoidCallback onEditLayout;
+  final GlobalKey weatherKey;
+  final GlobalKey layoutKey;
 
   @override
   Widget build(BuildContext context) {
@@ -398,6 +499,8 @@ class _TodayHeading extends StatelessWidget {
               children: [
                 Text(
                   greeting,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -405,29 +508,126 @@ class _TodayHeading extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
-                Text(
-                  '今日指挥台',
-                  style: TextStyle(
-                    height: 1.1,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: palette.text,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '今日指挥台',
+                    maxLines: 1,
+                    style: TextStyle(
+                      height: 1.1,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: palette.text,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   dateLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: palette.textFaint),
                 ),
               ],
             ),
           ),
-          _WeatherChip(
-            weather: weather,
-            reduceMotion: reduceMotion,
-            onTap: onWeatherTap,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              KeyedSubtree(
+                key: weatherKey,
+                child: _WeatherChip(
+                  weather: weather,
+                  reduceMotion: reduceMotion,
+                  onTap: onWeatherTap,
+                ),
+              ),
+              const SizedBox(width: 8),
+              KeyedSubtree(
+                key: layoutKey,
+                child: IconButton.filledTonal(
+                  tooltip: '编辑今日看板',
+                  onPressed: onEditLayout,
+                  icon: const Icon(Icons.dashboard_customize_outlined),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WidgetManagerItem extends StatelessWidget {
+  const _WidgetManagerItem({
+    required this.config,
+    required this.onVisibleChanged,
+    required this.onSizeChanged,
+  });
+
+  final TodayTileConfig config;
+  final ValueChanged<bool> onVisibleChanged;
+  final ValueChanged<TodayTileSize> onSizeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.surface.withValues(alpha: 0.82),
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _tileLabel(config.id),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        config.visible
+                            ? '当前 ${_sizeLabel(config.size)}'
+                            : '已隐藏',
+                        style: TextStyle(fontSize: 11, color: palette.textSoft),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: config.visible,
+                  onChanged: onVisibleChanged,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                for (final size in TodayTileSize.values)
+                  ChoiceChip(
+                    selected: config.size == size,
+                    label: Text(_sizeLabel(size)),
+                    onSelected: config.visible
+                        ? (_) => onSizeChanged(size)
+                        : null,
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -550,6 +750,13 @@ String _tileLabel(TodayTileId id) => switch (id) {
   TodayTileId.tasks => '当天待办',
   TodayTileId.courseWork => '课程作业',
   TodayTileId.materials => '携带物品',
+};
+
+String _sizeLabel(TodayTileSize size) => switch (size) {
+  TodayTileSize.oneByOne => '1×1 单栏紧凑',
+  TodayTileSize.oneByTwo => '1×2 单栏加高',
+  TodayTileSize.twoByOne => '2×1 通栏紧凑',
+  TodayTileSize.twoByTwo => '2×2 通栏加高',
 };
 
 extension _FirstOrNull<T> on Iterable<T> {
