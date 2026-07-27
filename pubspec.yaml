@@ -1,5 +1,5 @@
 name: yotsuba_schedule
-description: "An offline-first, cross-platform student schedule and daily command center."
+description: "面向中国大学生的离线优先跨平台课表与今日指挥台。"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

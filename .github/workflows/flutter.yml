@@ -19,3 +19,17 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run: flutter build web
+      - name: Verify reusable package
+        working-directory: packages/yotsuba_schedule_kit
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib test example/lib example/test
+          flutter analyze
+          flutter test
+          dart pub publish --dry-run
+      - name: Build package example
+        working-directory: packages/yotsuba_schedule_kit/example
+        run: |
+          flutter pub get
+          flutter test
+          flutter build web --release

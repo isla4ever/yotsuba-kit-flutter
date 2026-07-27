@@ -30,7 +30,6 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 }
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
-  late final PageController _weekController;
   bool _editing = false;
   bool _toolMenuOpen = false;
   final _screenGuideKey = GlobalKey();
@@ -45,19 +44,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    final week = ref.read(scheduleControllerProvider).currentWeek;
-    _weekController = PageController(initialPage: week - 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ref.read(scheduleOnboardingProvider.notifier).startIfNeeded();
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _weekController.dispose();
-    super.dispose();
   }
 
   @override
@@ -119,57 +110,40 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                     color: _editing
                         ? context.palette.canvas.withValues(alpha: 0.96)
                         : Colors.transparent,
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: (notification) =>
-                          _handleWeekScroll(notification, controller),
-                      child: PageView.builder(
-                        controller: _weekController,
-                        itemCount: schedule.totalWeeks,
-                        physics: const BouncingScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
+                    child: WeekTimetable(
+                      termStart: schedule.termStart,
+                      week: schedule.currentWeek,
+                      courses: schedule.courses,
+                      dayOverrides: schedule.dayOverrides,
+                      weather: weather.snapshot,
+                      visibleDays: settings.showWeekend ? 7 : 5,
+                      rowHeight: settings.scheduleRowHeight,
+                      courseTimes: settings.summerSchedule
+                          ? summerCourseTimes
+                          : standardCourseTimes,
+                      editing: _editing,
+                      reduceMotion: settings.reduceMotion,
+                      onSwipeWeek: (direction) =>
+                          controller.setWeek(schedule.currentWeek + direction),
+                      onCourseTap: (course) =>
+                          _showCourse(course, schedule.currentWeek),
+                      onDayTap: (weekday) => showDayPlannerSheet(
+                        context,
+                        date: ScheduleEngine.dateForWeekday(
+                          schedule.termStart,
+                          schedule.currentWeek,
+                          weekday,
                         ),
-                        itemBuilder: (context, index) {
-                          final week = index + 1;
-                          return WeekTimetable(
-                            key: ValueKey('week-$week'),
-                            termStart: schedule.termStart,
-                            week: week,
-                            courses: schedule.courses,
-                            dayOverrides: schedule.dayOverrides,
-                            weather: weather.snapshot,
-                            visibleDays: settings.showWeekend ? 7 : 5,
-                            rowHeight: settings.scheduleRowHeight,
-                            courseTimes: settings.summerSchedule
-                                ? summerCourseTimes
-                                : standardCourseTimes,
-                            editing: _editing,
-                            pageController: _weekController,
-                            reduceMotion: settings.reduceMotion,
-                            onCourseTap: (course) => _showCourse(course, week),
-                            onDayTap: (weekday) => showDayPlannerSheet(
-                              context,
-                              date: ScheduleEngine.dateForWeekday(
-                                schedule.termStart,
-                                week,
-                                weekday,
-                              ),
-                            ),
-                            onEmptyCellTap: (weekday, start, end) => _addCourse(
-                              controller,
-                              schedule,
-                              weekday: weekday,
-                              section: start,
-                              endSection: end,
-                            ),
-                            dayGuideKey: week == schedule.currentWeek
-                                ? _dayGuideKey
-                                : null,
-                            courseGuideKey: week == schedule.currentWeek
-                                ? _courseGuideKey
-                                : null,
-                          );
-                        },
                       ),
+                      onEmptyCellTap: (weekday, start, end) => _addCourse(
+                        controller,
+                        schedule,
+                        weekday: weekday,
+                        section: start,
+                        endSection: end,
+                      ),
+                      dayGuideKey: _dayGuideKey,
+                      courseGuideKey: _courseGuideKey,
                     ),
                   ),
                 ),
@@ -437,34 +411,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         );
       },
     );
-    if (selected == null) return;
-    if (!_weekController.hasClients) return;
-    final current = (_weekController.page ?? (schedule.currentWeek - 1))
-        .round();
-    if ((selected - 1 - current).abs() <= 1) {
-      await _weekController.animateToPage(
-        selected - 1,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    } else {
-      _weekController.jumpToPage(selected - 1);
-    }
-    if (mounted) _settleWeek(selected, controller);
-  }
-
-  bool _handleWeekScroll(
-    ScrollNotification notification,
-    ScheduleController controller,
-  ) {
-    if (notification is ScrollEndNotification && _weekController.hasClients) {
-      final week = (_weekController.page ?? 0).round() + 1;
-      _settleWeek(week, controller);
-    }
-    return false;
-  }
-
-  void _settleWeek(int week, ScheduleController controller) {
-    controller.setWeek(week);
+    if (selected == null || !mounted) return;
+    controller.setWeek(selected);
   }
 }

@@ -1,7 +1,7 @@
 name: yotsuba_schedule_kit_example
-description: Demo app for yotsuba_schedule_kit.
+description: yotsuba_schedule_kit 完整公开 API 的 Flutter 演示项目。
 publish_to: 'none'
-version: 0.1.0
+version: 0.5.0
 
 environment:
   sdk: ^3.5.0
@@ -12,5 +12,16 @@ dependencies:
   yotsuba_schedule_kit:
     path: ../
 
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/OFL-NotoSansSC.txt
+  fonts:
+    - family: YotsubaDemoSans
+      fonts:
+        - asset: assets/fonts/NotoSansSC-Demo.ttf

@@ -2,12 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'config.dart';
 import 'engine.dart';
 import 'models.dart';
 import 'theme.dart';
-
-/// 换周过渡预设。
-enum YsTransition { wave, none }
+import 'weather.dart';
 
 class _Wave {
   static const colStepMs = 30;
@@ -51,6 +50,9 @@ class YsWeekTimetable extends StatefulWidget {
     this.breakAfterSection = 4,
     this.theme = YsScheduleTheme.light,
     this.transition = YsTransition.wave,
+    this.density = YsScheduleDensity.normal,
+    this.cardEffect = YsCardEffect.shimmer,
+    this.weather,
     this.reduceMotion = false,
     this.swipeable = true,
     this.inactiveBadge = '非本周',
@@ -60,6 +62,8 @@ class YsWeekTimetable extends StatefulWidget {
     this.onWeekRequested,
     this.onCourseTap,
     this.onDayTap,
+    this.onTransitionStart,
+    this.onTransitionEnd,
     super.key,
   });
 
@@ -73,6 +77,9 @@ class YsWeekTimetable extends StatefulWidget {
   final int breakAfterSection;
   final YsScheduleTheme theme;
   final YsTransition transition;
+  final YsScheduleDensity density;
+  final YsCardEffect cardEffect;
+  final YsWeatherSnapshot? weather;
   final bool reduceMotion;
   final bool swipeable;
   final String inactiveBadge;
@@ -85,9 +92,11 @@ class YsWeekTimetable extends StatefulWidget {
   final void Function(YsDisplayCourse course, List<YsDisplayCourse> stack)?
       onCourseTap;
   final void Function(int weekday, DateTime? date)? onDayTap;
+  final ValueChanged<YsTransition>? onTransitionStart;
+  final ValueChanged<YsTransition>? onTransitionEnd;
 
   static const railWidth = 48.0;
-  static const headerHeight = 54.0;
+  static const headerHeight = 58.0;
   static const breakHeight = 34.0;
   static const topInset = 6.0;
 
@@ -111,6 +120,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
       value: 1,
     );
   }
+
   int? _leavingWeek;
   bool _forward = true;
   double _dragDx = 0;
@@ -128,9 +138,11 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
         _wave.value = 1;
       } else {
         _leavingWeek = oldWidget.week;
+        widget.onTransitionStart?.call(widget.transition);
         _wave.forward(from: 0).whenCompleteOrCancel(() {
           if (mounted && _wave.value >= 1) {
             setState(() => _leavingWeek = null);
+            widget.onTransitionEnd?.call(widget.transition);
           }
         });
       }
@@ -187,8 +199,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
                       ? (details) => _dragDx += details.delta.dx
                       : null,
                   onHorizontalDragEnd: widget.swipeable
-                      ? (details) =>
-                          _settleSwipe(details, constraints.maxWidth)
+                      ? (details) => _settleSwipe(details, constraints.maxWidth)
                       : null,
                   child: _buildGrid(dayWidth),
                 ),
@@ -235,7 +246,8 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
     );
   }
 
-  Widget _buildDay(int day, double dayWidth, DateTime now, YsScheduleTheme theme) {
+  Widget _buildDay(
+      int day, double dayWidth, DateTime now, YsScheduleTheme theme) {
     final date = widget.termStart == null
         ? null
         : dateFor(widget.termStart!, widget.week, day);
@@ -243,14 +255,16 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
         date.year == now.year &&
         date.month == now.month &&
         date.day == now.day;
+    final daily = date == null
+        ? null
+        : widget.weather?.weatherForDate(formatDateKey(date));
     return SizedBox(
       width: dayWidth,
       height: YsWeekTimetable.headerHeight,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onDayTap == null
-            ? null
-            : () => widget.onDayTap!(day, date),
+        onTap:
+            widget.onDayTap == null ? null : () => widget.onDayTap!(day, date),
         child: ColoredBox(
           color: isToday ? theme.accentSoft : Colors.transparent,
           child: Column(
@@ -268,6 +282,28 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
                 Text(
                   '${date.month}/${date.day}',
                   style: TextStyle(fontSize: 9, color: theme.text3),
+                ),
+              if (daily != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    YsWeatherGlyph(
+                      kind: daily.kind,
+                      size: 10,
+                      animate: !widget.reduceMotion,
+                      color: isToday ? theme.accent : theme.text3,
+                    ),
+                    if (daily.highC != null) ...[
+                      const SizedBox(width: 2),
+                      Text(
+                        '${daily.highC!.round()}°',
+                        style: TextStyle(
+                          fontSize: 8,
+                          color: isToday ? theme.accent : theme.text3,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
             ],
           ),
@@ -333,18 +369,29 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
             ),
           ),
         ),
-        // 旧周垫底：稳定格与新周像素一致直接跳过，其余延迟淡出
-        for (final cell in leavingCells)
-          if (currentSignatures[cell.cellKey] != cell.signature)
-            _positionedCell(cell, dayWidth, leaving: true),
-        for (final cell in cells)
-          _positionedCell(
-            cell,
+        if (widget.transition == YsTransition.wave) ...[
+          // 波浪模式跳过视觉完全不变的格子，其余旧卡延迟淡出。
+          for (final cell in leavingCells)
+            if (currentSignatures[cell.cellKey] != cell.signature)
+              _positionedCell(cell, dayWidth, leaving: true),
+          for (final cell in cells)
+            _positionedCell(
+              cell,
+              dayWidth,
+              leaving: false,
+              animate: _leavingWeek != null &&
+                  leavingSignatures[cell.cellKey] != cell.signature,
+            ),
+        ] else ...[
+          if (leavingCells.isNotEmpty)
+            _pageLayer(leavingCells, dayWidth, leaving: true),
+          _pageLayer(
+            cells,
             dayWidth,
             leaving: false,
-            animate: _leavingWeek != null &&
-                leavingSignatures[cell.cellKey] != cell.signature,
+            animate: leavingCells.isNotEmpty,
           ),
+        ],
       ]),
     );
   }
@@ -381,14 +428,22 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
     double dayWidth, {
     required bool leaving,
     bool animate = false,
+    bool wave = true,
   }) {
     final course = cell.top;
     final top = _sectionTop(course.course.startSection);
     final span = course.course.endSection - course.course.startSection + 1;
-    final includesBreak = course.course.startSection <= widget.breakAfterSection &&
-        course.course.endSection > widget.breakAfterSection;
+    final includesBreak =
+        course.course.startSection <= widget.breakAfterSection &&
+            course.course.endSection > widget.breakAfterSection;
     final height = span * widget.rowHeight +
         (includesBreak ? YsWeekTimetable.breakHeight : 0);
+    final date = widget.termStart == null
+        ? null
+        : dateFor(widget.termStart!, cell.week, course.weekday);
+    final daily = date == null
+        ? null
+        : widget.weather?.weatherForDate(formatDateKey(date));
 
     Widget child = _CourseCard(
       cell: cell,
@@ -396,12 +451,17 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
       theme: widget.theme,
       inactiveBadge: widget.inactiveBadge,
       makeupBadge: widget.makeupBadge,
+      density: widget.density,
+      effect: widget.cardEffect,
+      reduceMotion: widget.reduceMotion || leaving,
+      narrow: dayWidth < 58,
+      weather: daily,
       onTap: leaving || widget.onCourseTap == null
           ? null
           : () => widget.onCourseTap!(course, cell.group),
     );
 
-    if (leaving || animate) {
+    if (wave && (leaving || animate)) {
       final delay = _Wave.delayMs(
         weekday: course.weekday,
         startSection: course.course.startSection,
@@ -449,6 +509,90 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
       child: IgnorePointer(ignoring: leaving, child: child),
     );
   }
+
+  Widget _pageLayer(
+    List<_CellView> cells,
+    double dayWidth, {
+    required bool leaving,
+    bool animate = true,
+  }) {
+    Widget layer = Stack(
+      children: [
+        for (final cell in cells)
+          _positionedCell(
+            cell,
+            dayWidth,
+            leaving: leaving,
+            wave: false,
+          ),
+      ],
+    );
+    if (animate) {
+      layer = AnimatedBuilder(
+        animation: _wave,
+        child: layer,
+        builder: (context, child) {
+          final value = Curves.easeOutCubic.transform(_wave.value);
+          return _buildPageTransform(child!, value, leaving);
+        },
+      );
+    }
+    return Positioned.fill(child: layer);
+  }
+
+  Widget _buildPageTransform(Widget child, double value, bool leaving) {
+    final direction = _forward ? 1.0 : -1.0;
+    final opacity = leaving ? 1 - value : value;
+    Widget transformed = child;
+    switch (widget.transition) {
+      case YsTransition.slide:
+        transformed = Transform.translate(
+          offset: Offset(
+            leaving ? -direction * value * 24 : direction * (1 - value) * 28,
+            0,
+          ),
+          child: child,
+        );
+        break;
+      case YsTransition.fade:
+        transformed = child;
+        break;
+      case YsTransition.cube:
+        final matrix = Matrix4.identity()
+          ..setEntry(3, 2, 0.0015)
+          ..rotateY(
+            leaving
+                ? -direction * value * 0.58
+                : direction * (1 - value) * 0.72,
+          );
+        transformed = Transform(
+          transform: matrix,
+          alignment:
+              direction > 0 ? Alignment.centerLeft : Alignment.centerRight,
+          child: child,
+        );
+        break;
+      case YsTransition.drop:
+        transformed = Transform.translate(
+          offset: Offset(0, leaving ? value * 14 : -(1 - value) * 20),
+          child: Transform.scale(
+            scale: leaving ? 1 - value * 0.015 : 0.98 + value * 0.02,
+            child: child,
+          ),
+        );
+        break;
+      case YsTransition.zoom:
+        transformed = Transform.scale(
+          scale: leaving ? 1 + value * 0.045 : 0.88 + value * 0.12,
+          child: child,
+        );
+        break;
+      case YsTransition.wave || YsTransition.none:
+        transformed = child;
+        break;
+    }
+    return Opacity(opacity: opacity.clamp(0, 1).toDouble(), child: transformed);
+  }
 }
 
 /// 一个格位在某周的显示快照（顶卡 + 重叠数），用于新旧对比与稳定判定。
@@ -481,6 +625,11 @@ class _CourseCard extends StatelessWidget {
     required this.theme,
     required this.inactiveBadge,
     required this.makeupBadge,
+    required this.density,
+    required this.effect,
+    required this.reduceMotion,
+    required this.narrow,
+    this.weather,
     this.onTap,
   });
 
@@ -489,22 +638,31 @@ class _CourseCard extends StatelessWidget {
   final YsScheduleTheme theme;
   final String inactiveBadge;
   final String makeupBadge;
+  final YsScheduleDensity density;
+  final YsCardEffect effect;
+  final bool reduceMotion;
+  final bool narrow;
+  final YsDailyWeather? weather;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final course = cell.top;
     final active = course.isMakeup || course.active;
-    final status = course.isMakeup ? makeupBadge : (active ? '' : inactiveBadge);
-    final background = course.isMakeup
+    final status =
+        course.isMakeup ? makeupBadge : (active ? '' : inactiveBadge);
+    final baseBackground = course.isMakeup
         ? Color.lerp(color, theme.warning, 0.76)!
         : active
             ? color
             : theme.surface3;
+    final background = weather == null || !active
+        ? baseBackground
+        : Color.lerp(baseBackground, _weatherAccent(weather!.kind), 0.18)!;
     final foreground = active ? Colors.white : theme.text2;
 
     return Padding(
-      padding: const EdgeInsets.all(3),
+      padding: EdgeInsets.all(narrow ? 2 : 3),
       child: Stack(clipBehavior: Clip.none, children: [
         Positioned.fill(
           child: Material(
@@ -516,7 +674,8 @@ class _CourseCard extends StatelessWidget {
                 color: active
                     ? background.withValues(alpha: 0.72)
                     : theme.borderStrong,
-                style: course.course.custom ? BorderStyle.none : BorderStyle.solid,
+                style:
+                    course.course.custom ? BorderStyle.none : BorderStyle.solid,
               ),
             ),
             child: InkWell(
@@ -540,7 +699,7 @@ class _CourseCard extends StatelessWidget {
                         child: Text(
                           status,
                           style: TextStyle(
-                            fontSize: 7,
+                            fontSize: narrow ? 6 : 7,
                             fontWeight: FontWeight.w800,
                             color: active ? Colors.white : theme.text1,
                           ),
@@ -548,17 +707,21 @@ class _CourseCard extends StatelessWidget {
                       ),
                     Text(
                       course.course.name,
-                      maxLines: 3,
+                      maxLines: narrow
+                          ? 5
+                          : (density == YsScheduleDensity.minimal ? 4 : 3),
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        height: 1.2,
-                        fontSize: 11,
+                        height: narrow ? 1.05 : 1.2,
+                        fontSize: narrow ? 8 : 11,
                         fontWeight: FontWeight.w800,
                         color: foreground,
                       ),
                     ),
-                    if (course.course.location != null)
+                    if (!narrow &&
+                        density != YsScheduleDensity.minimal &&
+                        course.course.location != null)
                       Text(
                         '@${course.course.location}',
                         maxLines: 1,
@@ -568,28 +731,63 @@ class _CourseCard extends StatelessWidget {
                           color: foreground.withValues(alpha: 0.86),
                         ),
                       ),
+                    if (!narrow &&
+                        density == YsScheduleDensity.rich &&
+                        course.course.teacher != null)
+                      Text(
+                        course.course.teacher!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: narrow ? 6 : 8,
+                          color: foreground.withValues(alpha: 0.78),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-        Positioned(
-          right: 2,
-          bottom: 4,
-          left: 2,
-          child: IgnorePointer(
-            child: Text(
-              '(${course.course.startWeek}-${course.course.endWeek}周)',
-              maxLines: 1,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 8,
-                color: foreground.withValues(alpha: 0.88),
+        if (active && effect != YsCardEffect.none && !reduceMotion)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _CardEffectOverlay(effect: effect),
               ),
             ),
           ),
-        ),
+        if (density != YsScheduleDensity.minimal)
+          Positioned(
+            right: 2,
+            bottom: 4,
+            left: 2,
+            child: IgnorePointer(
+              child: Text(
+                '(${course.course.startWeek}-${course.course.endWeek}周)',
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 8,
+                  color: foreground.withValues(alpha: 0.88),
+                ),
+              ),
+            ),
+          ),
+        if (active && weather != null && !narrow)
+          Positioned(
+            top: 4,
+            left: 4,
+            child: IgnorePointer(
+              child: YsWeatherGlyph(
+                kind: weather!.kind,
+                size: 12,
+                animate: !reduceMotion,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+          ),
         if (cell.group.length > 1)
           Positioned(
             top: -2,
@@ -601,8 +799,7 @@ class _CourseCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFF1C232D),
                 shape: BoxShape.circle,
-                border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.82)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
               ),
               child: Text(
                 '${cell.group.length}',
@@ -616,6 +813,94 @@ class _CourseCard extends StatelessWidget {
             ),
           ),
       ]),
+    );
+  }
+}
+
+Color _weatherAccent(YsWeatherKind kind) => switch (kind) {
+      YsWeatherKind.clear => const Color(0xFFFFC857),
+      YsWeatherKind.rain ||
+      YsWeatherKind.drizzle ||
+      YsWeatherKind.storm =>
+        const Color(0xFF5AA9E6),
+      YsWeatherKind.snow => const Color(0xFFDDECF7),
+      YsWeatherKind.cloudy ||
+      YsWeatherKind.overcast ||
+      YsWeatherKind.fog =>
+        const Color(0xFF9FB2C3),
+      YsWeatherKind.neutral => const Color(0xFF9FB2C3),
+    };
+
+class _CardEffectOverlay extends StatefulWidget {
+  const _CardEffectOverlay({required this.effect});
+
+  final YsCardEffect effect;
+
+  @override
+  State<_CardEffectOverlay> createState() => _CardEffectOverlayState();
+}
+
+class _CardEffectOverlayState extends State<_CardEffectOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 3),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final value = _controller.value;
+        final decoration = switch (widget.effect) {
+          YsCardEffect.shimmer => BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment(-1.8 + value * 3.6, -1),
+                end: Alignment(-0.8 + value * 3.6, 1),
+                colors: const [
+                  Colors.transparent,
+                  Color(0x42FFFFFF),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          YsCardEffect.glow => BoxDecoration(
+              color: Colors.white.withValues(
+                alpha: 0.03 + math.sin(value * math.pi * 2).abs() * 0.09,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12 + value * 0.16),
+                width: 1.4,
+              ),
+            ),
+          YsCardEffect.aurora => BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment(-1 + value * 2, -1),
+                end: Alignment(1 - value * 2, 1),
+                colors: const [
+                  Color(0x0027E6A6),
+                  Color(0x3327E6A6),
+                  Color(0x264C6FFF),
+                  Color(0x00FFFFFF),
+                ],
+              ),
+            ),
+          YsCardEffect.breathe => BoxDecoration(
+              color: Colors.white.withValues(
+                alpha: 0.02 + (math.sin(value * math.pi * 2) + 1) * 0.035,
+              ),
+            ),
+          YsCardEffect.none => const BoxDecoration(),
+        };
+        return DecoratedBox(decoration: decoration);
+      },
     );
   }
 }

@@ -1,8 +1,26 @@
 # Changelog
 
+## 0.6.0
+
+- Added structured `materialDetails`, `books`, and `tasks` while retaining legacy string `materials`.
+- Enabled weather-aware course card glyphs/tints, weekday forecasts, weather detail heroes, and scenes by default.
+- Made `shimmer` the default card effect and kept all visual effects configurable.
+- Added configurable empty-value text while preserving detail labels for missing information.
+- Added animated overlap-course detail transitions within the same adaptive sheet.
+- Reworked Today for mobile whole-card dragging, four-corner resizing, course tasks, structured carry lists, and custom builders.
+
+## 0.5.0
+
+- Added high-level `YsSchedule` with configurable Header, built-in week picker, course detail, backgrounds, and host actions.
+- Added `slide`, `fade`, `cube`, `drop`, and `zoom` transitions alongside `wave` and `none`; all animated presets retain and fade the leaving week.
+- Added compact, standard, and full course-detail layouts with weather-aware Hero presentation.
+- Added per-sheet default placement and in-sheet Header controls for bottom, center, and right layouts.
+- Added weather snapshot/provider contracts, animated glyphs, date-header forecasts, and weather scenes.
+- Added schedule density, six color palettes, five card effects, and reduced-motion handling.
+- Added `YsToday` with six built-in modules, custom builders, long-press arrangement, reordering, and three widget sizes.
+- Expanded courses with materials, notes, and host metadata.
+- Rebuilt the example as a complete Schedule / Today / Settings showcase using only package APIs.
+
 ## 0.1.0
 
-- 首个版本:`YsWeekTimetable` 波浪覆盖换周课表组件(骨架常驻、稳定格静止、无空帧)
-- 学期语义引擎:单双周、调休补班、假日、重叠课连通分组、周次计算
-- `YsScheduleTheme` 主题令牌(light/dark)与课程颜色稳定分配
-- 受控 week、滑动换周回调、课程点击返回重叠组
+- Initial `YsWeekTimetable`, academic-term engine, wave transition, theme tokens, and overlap callbacks.

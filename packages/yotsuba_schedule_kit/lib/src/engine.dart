@@ -87,6 +87,7 @@ List<YsDisplayCourse> buildDisplayCourses(
         weekday: entry.key,
         active: true,
         makeupDate: override.date,
+        makeupName: override.name,
       ));
     }
   }
