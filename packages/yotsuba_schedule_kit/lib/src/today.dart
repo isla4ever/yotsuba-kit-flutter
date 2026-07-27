@@ -795,6 +795,7 @@ class _YsTodayState extends State<YsToday> {
     const labels = ['一', '二', '三', '四', '五', '六', '日'];
     final maxCount = math.max(1, counts.reduce(math.max));
     return Semantics(
+      key: const ValueKey('week-glance-chart'),
       label: '本周课程分布',
       image: true,
       child: SizedBox(

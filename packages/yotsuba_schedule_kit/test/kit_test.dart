@@ -477,12 +477,15 @@ void main() {
 
       await tester.pumpWidget(buildOverview(YsTodayWidgetSize.twoByTwo));
       await tester.pump();
-      expect(find.bySemanticsLabel('本周课程分布'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('week-glance-chart')),
+        findsOneWidget,
+      );
       expect(find.textContaining('本周共'), findsOneWidget);
 
       await tester.pumpWidget(buildOverview(YsTodayWidgetSize.oneByOne));
       await tester.pump();
-      expect(find.bySemanticsLabel('本周课程分布'), findsNothing);
+      expect(find.byKey(const ValueKey('week-glance-chart')), findsNothing);
       expect(find.text('课程块'), findsOneWidget);
     });
 
