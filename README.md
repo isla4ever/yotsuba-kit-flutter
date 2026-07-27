@@ -100,7 +100,7 @@ YsSchedule(
 
 ```bash
 dart format --output=none --set-exit-if-changed lib test
-flutter analyze
+flutter analyze lib test
 flutter test
 flutter build web
 ```
