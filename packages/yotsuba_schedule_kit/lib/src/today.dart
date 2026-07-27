@@ -176,12 +176,18 @@ class YsToday extends StatefulWidget {
 class _YsTodayState extends State<YsToday> {
   late List<YsTodayWidgetConfig> _widgets = List.of(widget.widgets);
   bool _editing = false;
+  String? _selectedWidgetId;
 
   @override
   void didUpdateWidget(covariant YsToday oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_sameWidgets(oldWidget.widgets, widget.widgets)) {
       _widgets = List.of(widget.widgets);
+      if (!_widgets.any(
+        (item) => item.enabled && item.id == _selectedWidgetId,
+      )) {
+        _selectedWidgetId = null;
+      }
     }
   }
 
@@ -327,6 +333,7 @@ class _YsTodayState extends State<YsToday> {
     YsTodayBuildContext data,
   ) {
     final config = _widgets[index];
+    final selected = _editing && _selectedWidgetId == config.id;
     final columns = availableWidth >= 760 ? 3 : 2;
     final unit = (availableWidth - (columns - 1) * 10) / columns;
     final span = math.min(config.size.columns, columns);
@@ -334,6 +341,24 @@ class _YsTodayState extends State<YsToday> {
     final height = config.size.rows * 138.0 + (config.size.rows - 1) * 10;
     final body = widget.customBuilders[config.id]?.call(context, data) ??
         _builtInWidget(config.id, data);
+    final animatedBody = AnimatedSwitcher(
+      duration: widget.reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.985, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey('${config.id}-${config.size.name}'),
+        child: body,
+      ),
+    );
     final weatherKind = widget.weather?.current?.kind;
     final weatherTint = weatherKind == null
         ? widget.theme.surface1
@@ -345,10 +370,21 @@ class _YsTodayState extends State<YsToday> {
     final tile = Semantics(
       label: '今日组件 ${_widgetTitle(config.id)}',
       button: true,
-      hint: widget.arrangeable ? '长按进入布局调整' : null,
+      selected: selected,
+      hint: _editing
+          ? (selected ? '已选择，长按拖动或从四角调整尺寸' : '点按选择，长按拖动重排')
+          : (widget.arrangeable ? '长按进入布局调整' : null),
       child: GestureDetector(
-        onLongPress: widget.arrangeable ? () => _setEditing(true) : null,
-        onTap: () => widget.onWidgetTap?.call(config.id),
+        onLongPress: widget.arrangeable
+            ? () => _setEditing(true, selectedWidgetId: config.id)
+            : null,
+        onTap: () {
+          if (_editing) {
+            _selectWidget(config.id);
+            return;
+          }
+          widget.onWidgetTap?.call(config.id);
+        },
         child: AnimatedContainer(
           key: ValueKey(config.id),
           width: width,
@@ -360,8 +396,8 @@ class _YsTodayState extends State<YsToday> {
           decoration: BoxDecoration(
             color: weatherTint.withValues(alpha: 0.94),
             border: Border.all(
-              color: _editing ? widget.theme.accent : widget.theme.border,
-              width: _editing ? 1.5 : 1,
+              color: selected ? widget.theme.accent : widget.theme.border,
+              width: selected ? 1.5 : 1,
             ),
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
@@ -372,44 +408,33 @@ class _YsTodayState extends State<YsToday> {
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(7),
-            child: Stack(
-              children: [
-                Positioned.fill(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
                   child: Padding(
                     padding: const EdgeInsets.all(14),
-                    child: IgnorePointer(ignoring: _editing, child: body),
+                    child: IgnorePointer(
+                      ignoring: _editing,
+                      child: animatedBody,
+                    ),
                   ),
                 ),
-                if (_editing)
-                  Positioned(
-                    top: 8,
-                    left: 0,
-                    right: 0,
-                    child: IgnorePointer(
-                      child: Center(
-                        child: Icon(
-                          Icons.drag_indicator_rounded,
-                          size: 18,
-                          color: widget.theme.accent,
-                        ),
-                      ),
-                    ),
+              ),
+              if (selected)
+                for (final corner in YsTodayResizeCorner.values)
+                  _TodayResizeHandle(
+                    key: ValueKey('${config.id}-${corner.name}'),
+                    corner: corner,
+                    size: config.size,
+                    theme: widget.theme,
+                    onPreview: (size) => _previewSize(index, size),
+                    onCommit: (size) => _commitSize(index, size, corner),
+                    onCancel: (size) => _previewSize(index, size),
                   ),
-                if (_editing)
-                  for (final corner in YsTodayResizeCorner.values)
-                    _TodayResizeHandle(
-                      key: ValueKey('${config.id}-${corner.name}'),
-                      corner: corner,
-                      size: config.size,
-                      theme: widget.theme,
-                      onPreview: (size) => _previewSize(index, size),
-                      onCommit: (size) => _commitSize(index, size, corner),
-                      onCancel: (size) => _previewSize(index, size),
-                    ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -419,6 +444,7 @@ class _YsTodayState extends State<YsToday> {
       data: index,
       delay: const Duration(milliseconds: 120),
       dragAnchorStrategy: pointerDragAnchorStrategy,
+      onDragStarted: () => _selectWidget(config.id),
       feedback: Material(
         color: Colors.transparent,
         child: SizedBox(
@@ -679,18 +705,62 @@ class _YsTodayState extends State<YsToday> {
   }
 
   Widget _weekGlance(YsTodayBuildContext data) {
-    final active =
-        data.weekModel.courses.where((course) => course.active).length;
-    final days = data.weekModel.courses
-        .where((course) => course.active)
-        .map((course) => course.weekday)
-        .toSet()
-        .length;
+    final counts = List<int>.generate(
+      7,
+      (index) => data.weekModel.courses
+          .where((course) => course.active && course.weekday == index + 1)
+          .length,
+    );
+    final active = counts.fold<int>(0, (total, count) => total + count);
+    final days = counts.where((count) => count > 0).length;
+    final compact = data.size.columns == 1 && data.size.rows == 1;
+    final tall = data.size.columns == 1 && data.size.rows == 2;
+    final wide = data.size.columns == 2 && data.size.rows == 1;
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _eyebrow(Icons.calendar_view_week_outlined, '本周一览'),
+          const Spacer(),
+          Row(
+            children: [
+              _metric('$active', '课程块'),
+              const SizedBox(width: 18),
+              _metric('第 ${data.week}', '当前周'),
+            ],
+          ),
+          const Spacer(),
+        ],
+      );
+    }
+
+    if (tall) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _eyebrow(Icons.calendar_view_week_outlined, '本周节奏'),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 18,
+            runSpacing: 10,
+            children: [
+              _metric('$active', '课程块'),
+              _metric('$days', '上课日'),
+              _metric('第 ${data.week}', '当前周'),
+            ],
+          ),
+          const Spacer(),
+          _weekBars(counts, height: 92, showValues: true),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _eyebrow(Icons.calendar_view_week_outlined, '本周一览'),
-        const Spacer(),
+        SizedBox(height: wide ? 7 : 12),
         Row(
           children: [
             _metric('$active', '节次块'),
@@ -700,8 +770,92 @@ class _YsTodayState extends State<YsToday> {
             _metric('第 ${data.week}', '当前周'),
           ],
         ),
-        const Spacer(),
+        SizedBox(height: wide ? 7 : 16),
+        _weekBars(
+          counts,
+          height: wide ? 34 : 112,
+          showValues: !wide,
+        ),
+        if (!wide) ...[
+          const SizedBox(height: 10),
+          Text(
+            '本周共 $active 个课程块 · $days 个上课日',
+            style: TextStyle(fontSize: 10, color: widget.theme.text2),
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _weekBars(
+    List<int> counts, {
+    required double height,
+    required bool showValues,
+  }) {
+    const labels = ['一', '二', '三', '四', '五', '六', '日'];
+    final maxCount = math.max(1, counts.reduce(math.max));
+    return Semantics(
+      label: '本周课程分布',
+      image: true,
+      child: SizedBox(
+        height: height,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (var index = 0; index < counts.length; index++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Column(
+                    children: [
+                      if (showValues)
+                        Text(
+                          '${counts[index]}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: widget.theme.text2,
+                          ),
+                        ),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: FractionallySizedBox(
+                            heightFactor: counts[index] == 0
+                                ? 0.06
+                                : math
+                                    .max(0.14, counts[index] / maxCount)
+                                    .toDouble(),
+                            widthFactor: 1,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Color.lerp(
+                                  widget.theme.accent,
+                                  widget.theme.warning,
+                                  0.22,
+                                ),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        labels[index],
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: widget.theme.text3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -838,10 +992,22 @@ class _YsTodayState extends State<YsToday> {
         _ => id,
       };
 
-  void _setEditing(bool value) {
-    if (_editing == value) return;
-    setState(() => _editing = value);
-    widget.onLayoutEditing?.call(value);
+  void _setEditing(bool value, {String? selectedWidgetId}) {
+    final editingChanged = _editing != value;
+    final nextSelected = value ? selectedWidgetId : null;
+    if (!editingChanged && _selectedWidgetId == nextSelected) return;
+    setState(() {
+      _editing = value;
+      _selectedWidgetId = nextSelected;
+    });
+    if (editingChanged) {
+      widget.onLayoutEditing?.call(value);
+    }
+  }
+
+  void _selectWidget(String id) {
+    if (!_editing || _selectedWidgetId == id) return;
+    setState(() => _selectedWidgetId = id);
   }
 
   void _move(int from, int to) {
@@ -908,6 +1074,8 @@ class _TodayResizeHandleState extends State<_TodayResizeHandle> {
         widget.corner == YsTodayResizeCorner.topRight;
     final left = widget.corner == YsTodayResizeCorner.topLeft ||
         widget.corner == YsTodayResizeCorner.bottomLeft;
+    final alignment = Alignment(left ? -1 : 1, top ? -1 : 1);
+    final markerOffset = Offset(left ? -5 : 5, top ? -5 : 5);
     return Positioned(
       top: top ? 0 : null,
       bottom: top ? null : 0,
@@ -946,17 +1114,32 @@ class _TodayResizeHandleState extends State<_TodayResizeHandle> {
           child: SizedBox(
             width: 32,
             height: 32,
-            child: Transform.rotate(
-              angle: switch (widget.corner) {
-                YsTodayResizeCorner.topLeft => 0,
-                YsTodayResizeCorner.topRight => math.pi / 2,
-                YsTodayResizeCorner.bottomRight => math.pi,
-                YsTodayResizeCorner.bottomLeft => math.pi * 1.5,
-              },
-              child: Icon(
-                Icons.keyboard_double_arrow_up_rounded,
-                size: 18,
-                color: widget.theme.accent,
+            child: Align(
+              alignment: alignment,
+              child: Transform.translate(
+                offset: markerOffset,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: widget.theme.surface1,
+                    border: Border.all(
+                      color: Color.lerp(
+                        widget.theme.border,
+                        widget.theme.accent,
+                        0.82,
+                      )!,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.14),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: const SizedBox.square(dimension: 10),
+                ),
               ),
             ),
           ),

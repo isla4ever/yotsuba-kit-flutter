@@ -399,6 +399,93 @@ void main() {
       expect(changed?.single.size, YsTodayWidgetSize.twoByTwo);
     });
 
+    testWidgets('Today shows resize handles only on the selected card',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsToday(
+            courses: courses,
+            termStart: DateTime(2026, 3, 2),
+            now: DateTime(2026, 3, 2, 9),
+            widgets: const [
+              YsTodayWidgetConfig(
+                id: YsTodayWidgetIds.nextCourse,
+                size: YsTodayWidgetSize.oneByOne,
+              ),
+              YsTodayWidgetConfig(
+                id: YsTodayWidgetIds.weather,
+                size: YsTodayWidgetSize.oneByOne,
+              ),
+            ],
+            reduceMotion: true,
+          ),
+        ),
+      ));
+
+      await tester.tap(find.byTooltip('调整今日布局'));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp('从.+角调整组件尺寸')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('next-course')));
+      await tester.pump();
+      for (final corner in YsTodayResizeCorner.values) {
+        expect(
+          find.byKey(ValueKey('next-course-${corner.name}')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('weather-${corner.name}')),
+          findsNothing,
+        );
+      }
+
+      await tester.tap(find.byKey(const ValueKey('weather')));
+      await tester.pump();
+      for (final corner in YsTodayResizeCorner.values) {
+        expect(
+          find.byKey(ValueKey('next-course-${corner.name}')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(ValueKey('weather-${corner.name}')),
+          findsOneWidget,
+        );
+      }
+    });
+
+    testWidgets('Today weekly overview adapts content to the card size',
+        (tester) async {
+      Widget buildOverview(YsTodayWidgetSize size) => MaterialApp(
+            home: Scaffold(
+              body: YsToday(
+                courses: courses,
+                termStart: DateTime(2026, 3, 2),
+                now: DateTime(2026, 3, 2, 9),
+                widgets: [
+                  YsTodayWidgetConfig(
+                    id: YsTodayWidgetIds.weekGlance,
+                    size: size,
+                  ),
+                ],
+                reduceMotion: true,
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(buildOverview(YsTodayWidgetSize.twoByTwo));
+      await tester.pump();
+      expect(find.bySemanticsLabel('本周课程分布'), findsOneWidget);
+      expect(find.textContaining('本周共'), findsOneWidget);
+
+      await tester.pumpWidget(buildOverview(YsTodayWidgetSize.oneByOne));
+      await tester.pump();
+      expect(find.bySemanticsLabel('本周课程分布'), findsNothing);
+      expect(find.text('课程块'), findsOneWidget);
+    });
+
     testWidgets('Today drags the whole card to reorder widgets',
         (tester) async {
       List<YsTodayWidgetConfig>? changed;

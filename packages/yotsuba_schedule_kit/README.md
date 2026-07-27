@@ -28,7 +28,7 @@ flutter pub add yotsuba_schedule_kit
 - 天气快照与 Provider 协议、逐日表头图标/最高温、课程卡色调、详情联动和默认动态场景
 - 每类弹窗独立默认位置，支持底部、居中、右侧，并可在弹窗 Header 内临时切换
 - 课程模型支持 `books` / `materialDetails` / `tasks`，并兼容旧版字符串 `materials`
-- `YsToday` 内置七种模块，长按进入布局编辑，整卡拖动排序、四角缩放，并支持自定义 Builder
+- `YsToday` 内置七种模块，长按进入布局编辑，整卡拖动排序；选中单卡后显示贴边四角缩放控点，并支持自定义 Builder
 - 浅色 / 深色主题令牌、自定义背景、自定义 Today 模块和宿主动作回调
 - `MediaQuery.disableAnimations`、显式 `reduceMotion`、语义标签和键盘可达的 Material 控件
 
@@ -140,6 +140,20 @@ YsTodayWidgetIds.weather
 ```
 
 自定义模块通过 `customBuilders` 注入，不需要 fork 组件库。空数据可用 `emptyText` 统一设置，或用 `emptyTexts` 按模块覆盖。
+
+`YsTodayBuildContext.size` 会随四角缩放实时变化。自定义模块应按 `columns / rows` 披露不同层级，小卡保留关键数字，大卡可以加入图表：
+
+```dart
+customBuilders: {
+  'study-load': (context, data) => StudyLoadCard(
+    columns: data.size.columns,
+    rows: data.size.rows,
+    showChart: data.size.columns == 2 && data.size.rows == 2,
+  ),
+},
+```
+
+组件在尺寸变化时对卡片宽高和内容执行协调过渡；`reduceMotion` 或系统减少动态效果开启时会禁用该动画。
 
 ## 天气接入
 

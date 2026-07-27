@@ -15,3 +15,5 @@ Web 演示内置了约 325 KB 的 Noto Sans SC 字体子集，保证中文标签
 - Web 主体组件库：[yotsuba-kit](https://github.com/isla4ever/yotsuba-kit)
 - Vue / React / 原生 Web 演示：[yotsuba-kit-playground](https://github.com/isla4ever/yotsuba-kit-playground)
 - Flutter 仓库：[yotsuba-kit-flutter](https://github.com/isla4ever/yotsuba-kit-flutter)
+
+「今日」默认同时展示 `1x1 / 1x2 / 2x1 / 2x2` 四种布局；大尺寸「本周一览」包含七日课程图表，可直接进入排版并观察选中、缩放和内容层级过渡。

@@ -85,10 +85,16 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
       size: YsTodayWidgetSize.compact,
     ),
     YsTodayWidgetConfig(id: YsTodayWidgetIds.timeline),
-    YsTodayWidgetConfig(id: YsTodayWidgetIds.readiness),
+    YsTodayWidgetConfig(
+      id: YsTodayWidgetIds.readiness,
+      size: YsTodayWidgetSize.oneByTwo,
+    ),
     YsTodayWidgetConfig(id: YsTodayWidgetIds.plans),
     YsTodayWidgetConfig(id: YsTodayWidgetIds.courseTasks),
-    YsTodayWidgetConfig(id: YsTodayWidgetIds.weekGlance),
+    YsTodayWidgetConfig(
+      id: YsTodayWidgetIds.weekGlance,
+      size: YsTodayWidgetSize.twoByTwo,
+    ),
   ];
 
   @override
