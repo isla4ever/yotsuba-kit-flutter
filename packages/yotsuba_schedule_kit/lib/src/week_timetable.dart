@@ -53,6 +53,7 @@ class YsWeekTimetable extends StatefulWidget {
     this.density = YsScheduleDensity.normal,
     this.cardEffect = YsCardEffect.none,
     this.weatherCardBackground = true,
+    this.weatherCardGlyph = false,
     this.weather,
     this.reduceMotion = false,
     this.swipeable = true,
@@ -81,6 +82,7 @@ class YsWeekTimetable extends StatefulWidget {
   final YsScheduleDensity density;
   final YsCardEffect cardEffect;
   final bool weatherCardBackground;
+  final bool weatherCardGlyph;
   final YsWeatherSnapshot? weather;
   final bool reduceMotion;
   final bool swipeable;
@@ -456,6 +458,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
       density: widget.density,
       effect: widget.cardEffect,
       weatherCardBackground: widget.weatherCardBackground,
+      weatherCardGlyph: widget.weatherCardGlyph,
       reduceMotion: widget.reduceMotion || leaving,
       narrow: dayWidth < 58,
       weather: daily,
@@ -631,6 +634,7 @@ class _CourseCard extends StatelessWidget {
     required this.density,
     required this.effect,
     required this.weatherCardBackground,
+    required this.weatherCardGlyph,
     required this.reduceMotion,
     required this.narrow,
     this.weather,
@@ -645,6 +649,7 @@ class _CourseCard extends StatelessWidget {
   final YsScheduleDensity density;
   final YsCardEffect effect;
   final bool weatherCardBackground;
+  final bool weatherCardGlyph;
   final bool reduceMotion;
   final bool narrow;
   final YsDailyWeather? weather;
@@ -665,9 +670,7 @@ class _CourseCard extends StatelessWidget {
         active &&
         weatherCardBackground &&
         effect == YsCardEffect.none;
-    final background = !showWeatherBackground
-        ? baseBackground
-        : Color.lerp(baseBackground, _weatherAccent(weather!.kind), 0.18)!;
+    final background = baseBackground;
     final foreground = active ? Colors.white : theme.text2;
 
     return Padding(
@@ -797,7 +800,7 @@ class _CourseCard extends StatelessWidget {
               ),
             ),
           ),
-        if (active && weather != null && !narrow)
+        if (active && weather != null && weatherCardGlyph && !narrow)
           Positioned(
             top: 4,
             left: 4,
@@ -838,21 +841,6 @@ class _CourseCard extends StatelessWidget {
     );
   }
 }
-
-Color _weatherAccent(YsWeatherKind kind) => switch (kind) {
-      YsWeatherKind.clear => const Color(0xFFFFC857),
-      YsWeatherKind.rain ||
-      YsWeatherKind.heavyRain ||
-      YsWeatherKind.drizzle ||
-      YsWeatherKind.storm =>
-        const Color(0xFF5AA9E6),
-      YsWeatherKind.snow => const Color(0xFFDDECF7),
-      YsWeatherKind.cloudy ||
-      YsWeatherKind.overcast ||
-      YsWeatherKind.fog =>
-        const Color(0xFF9FB2C3),
-      YsWeatherKind.neutral => const Color(0xFF9FB2C3),
-    };
 
 class _CardEffectOverlay extends StatefulWidget {
   const _CardEffectOverlay({required this.effect});

@@ -1206,16 +1206,6 @@ class _CourseCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (active && weather != null)
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: WeatherGlyph(
-                          kind: weatherPresentation(weather!.weatherCode).kind,
-                          size: 13,
-                          animate: !reduceMotion,
-                          color: Colors.white.withValues(alpha: 0.92),
-                        ),
-                      ),
                   ],
                 ),
               ),

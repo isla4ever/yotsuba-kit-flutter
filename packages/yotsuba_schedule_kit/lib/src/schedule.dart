@@ -35,6 +35,7 @@ class YsSchedule extends StatefulWidget {
     this.density = YsScheduleDensity.normal,
     this.cardEffect = YsCardEffect.none,
     this.weatherCardBackground = true,
+    this.weatherCardGlyph = false,
     this.reduceMotion = false,
     this.swipeable = true,
     this.weekPickerBuiltIn = true,
@@ -78,6 +79,7 @@ class YsSchedule extends StatefulWidget {
   final YsScheduleDensity density;
   final YsCardEffect cardEffect;
   final bool weatherCardBackground;
+  final bool weatherCardGlyph;
   final bool reduceMotion;
   final bool swipeable;
   final bool weekPickerBuiltIn;
@@ -200,6 +202,7 @@ class _YsScheduleState extends State<YsSchedule> {
             density: widget.density,
             cardEffect: widget.cardEffect,
             weatherCardBackground: widget.weatherCardBackground,
+            weatherCardGlyph: widget.weatherCardGlyph,
             weather: _weather,
             reduceMotion: widget.reduceMotion,
             swipeable: widget.swipeable,

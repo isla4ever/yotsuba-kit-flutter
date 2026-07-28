@@ -194,7 +194,22 @@ void main() {
         ),
       ));
       expect(find.byType(YsWeatherCardLayer), findsOneWidget);
-      expect(find.byType(YsWeatherGlyph), findsWidgets);
+      final defaultGlyphCount = find.byType(YsWeatherGlyph).evaluate().length;
+      expect(defaultGlyphCount, 1);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsWeekTimetable(
+            week: 1,
+            courses: courses,
+            termStart: DateTime(2026, 3, 2),
+            weather: weather,
+            weatherCardGlyph: true,
+            reduceMotion: true,
+          ),
+        ),
+      ));
+      expect(find.byType(YsWeatherGlyph), findsNWidgets(defaultGlyphCount + 1));
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -204,12 +219,13 @@ void main() {
             termStart: DateTime(2026, 3, 2),
             weather: weather,
             cardEffect: YsCardEffect.glow,
+            weatherCardGlyph: true,
             reduceMotion: true,
           ),
         ),
       ));
       expect(find.byType(YsWeatherCardLayer), findsNothing);
-      expect(find.byType(YsWeatherGlyph), findsWidgets);
+      expect(find.byType(YsWeatherGlyph), findsNWidgets(defaultGlyphCount + 1));
       expect(ysWeatherLabel(YsWeatherKind.heavyRain), '大雨');
     });
 

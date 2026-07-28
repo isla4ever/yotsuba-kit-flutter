@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+- Reworked course weather into localized micro-motion: sun halo, drifting cloud edge, glass rain traces, storm refraction, frost points, and feathered fog.
+- Preserved the original course color as the card foundation and made course-card weather glyphs opt-in with `weatherCardGlyph`.
+- Replaced full-screen precipitation and lightning flashes with slow blurred weather ambience and smoother state transitions.
+
 ## 0.6.0
 
 - Added structured `materialDetails`, `books`, and `tasks` while retaining legacy string `materials`.
