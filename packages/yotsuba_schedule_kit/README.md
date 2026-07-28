@@ -23,7 +23,7 @@ flutter pub add yotsuba_schedule_kit
 - 中国高校学期语义：单双周、起止周、假日、调休补班、重叠课程和非本周状态
 - 七种换周模式：`wave`、`slide`、`fade`、`cube`、`drop`、`zoom`、`none`
 - 旧周保留到离场动画结束，骨架常驻，不出现空白帧或瞬间闪退
-- 三档周 Header、三档课表信息密度、六套配色和五种课程卡特效，`shimmer` 为默认
+- 三档周 Header、三档课表信息密度、六套配色；课程卡默认实时天气，微光 / 辉光 / 极光 / 呼吸与天气层自动互斥
 - 精简 / 适中 / 全面课程详情，课程色 / 天气 / 极简三种 Hero
 - 天气快照与 Provider 协议、逐日表头图标/最高温、课程卡色调、详情联动和默认动态场景
 - 每类弹窗独立默认位置，支持底部、居中、右侧，并可在弹窗 Header 内临时切换
@@ -73,7 +73,8 @@ class SchedulePageState extends State<SchedulePage> {
       transition: YsTransition.wave,
       headerStyle: YsHeaderStyle.standard,
       density: YsScheduleDensity.normal,
-      cardEffect: YsCardEffect.shimmer,
+      cardEffect: YsCardEffect.none,
+      weatherCardBackground: true,
       detail: const YsCourseDetailConfig(
         layout: YsDetailLayout.standard,
         hero: YsDetailHero.weather,

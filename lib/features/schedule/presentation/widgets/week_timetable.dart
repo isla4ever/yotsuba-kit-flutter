@@ -8,6 +8,7 @@ import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_glyph.dart';
+import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
 
 /// 波浪覆盖换周：骨架（表头、时间轴、格线）常驻不动，旧周课程留在下层，
 /// 新周课程按“列为主、节次为辅”的对角线次序覆盖上来，任何一帧都不出现空网格。
@@ -230,6 +231,8 @@ class _WeekTimetableState extends State<WeekTimetable>
                       termStart: widget.termStart,
                       dayOverrides: widget.dayOverrides,
                       courseTimes: widget.courseTimes,
+                      weather: widget.weather,
+                      reduceMotion: widget.reduceMotion,
                       selectionDay: _selectionDay,
                       selectionStart: _selectionStart,
                       selectionEnd: _selectionEnd,
@@ -614,6 +617,8 @@ class _GridBody extends StatelessWidget {
     required this.courses,
     required this.dayOverrides,
     required this.courseTimes,
+    required this.weather,
+    required this.reduceMotion,
     required this.rowHeight,
     required this.dayWidth,
     required this.visibleDays,
@@ -635,6 +640,8 @@ class _GridBody extends StatelessWidget {
   final List<Course> courses;
   final List<AcademicDayOverride> dayOverrides;
   final List<CourseTime> courseTimes;
+  final WeatherSnapshot? weather;
+  final bool reduceMotion;
   final double rowHeight;
   final double dayWidth;
   final int visibleDays;
@@ -887,6 +894,12 @@ class _GridBody extends StatelessWidget {
     final includesBreak = course.startSection <= 4 && course.endSection > 4;
     final height =
         span * rowHeight + (includesBreak ? WeekTimetable.breakHeight : 0);
+    final date = ScheduleEngine.dateForWeekday(
+      termStart,
+      cell.week,
+      course.weekday,
+    );
+    final dailyWeather = weather?.weatherForDate(ScheduleEngine.dateKey(date));
     Widget child = Stack(
       clipBehavior: Clip.none,
       children: [
@@ -896,6 +909,8 @@ class _GridBody extends StatelessWidget {
             child: _CourseCard(
               course: course,
               active: course.occursInWeek(cell.week),
+              weather: dailyWeather,
+              reduceMotion: reduceMotion || leaving,
               onTap: () => onCourseTap(course),
             ),
           ),
@@ -1074,11 +1089,15 @@ class _CourseCard extends StatelessWidget {
   const _CourseCard({
     required this.course,
     required this.active,
+    required this.reduceMotion,
     required this.onTap,
+    this.weather,
   });
 
   final Course course;
   final bool active;
+  final bool reduceMotion;
+  final DailyWeather? weather;
   final VoidCallback onTap;
 
   @override
@@ -1104,81 +1123,103 @@ class _CourseCard extends StatelessWidget {
         ),
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(5, 5, 5, span == 1 ? 15 : 18),
-            child: Stack(
-              children: [
-                if (status.isNotEmpty)
-                  Align(
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      height: 14,
-                      constraints: const BoxConstraints(minWidth: 34),
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: palette.surface,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          fontSize: 7,
-                          fontWeight: FontWeight.w700,
-                          color: palette.text,
-                        ),
-                      ),
-                    ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (active && weather != null)
+                IgnorePointer(
+                  child: WeatherCardLayer(
+                    kind: weatherPresentation(weather!.weatherCode).kind,
+                    reduceMotion: reduceMotion,
                   ),
-                Padding(
-                  padding: EdgeInsets.only(top: status.isEmpty ? 0 : 10),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        course.name,
-                        maxLines: span == 1 ? 2 : 3,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          height: span == 1 ? 1.15 : 1.22,
-                          fontSize: span == 1 ? 10 : 12,
-                          fontWeight: FontWeight.w800,
-                          color: foreground,
-                        ),
-                      ),
-                      if (span > 1 && course.room.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          '@${course.room}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            height: 1.15,
-                            fontSize: 9,
-                            color: foreground.withValues(alpha: 0.86),
+                ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(5, 5, 5, span == 1 ? 15 : 18),
+                child: Stack(
+                  children: [
+                    if (status.isNotEmpty)
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          height: 14,
+                          constraints: const BoxConstraints(minWidth: 34),
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: palette.surface,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              fontSize: 7,
+                              fontWeight: FontWeight.w700,
+                              color: palette.text,
+                            ),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Text(
-                    '(${course.startWeek}-${course.endWeek}周)',
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: span == 1 ? 7 : 8,
-                      color: foreground.withValues(alpha: 0.88),
+                      ),
+                    Padding(
+                      padding: EdgeInsets.only(top: status.isEmpty ? 0 : 10),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            course.name,
+                            maxLines: span == 1 ? 2 : 3,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              height: span == 1 ? 1.15 : 1.22,
+                              fontSize: span == 1 ? 10 : 12,
+                              fontWeight: FontWeight.w800,
+                              color: foreground,
+                            ),
+                          ),
+                          if (span > 1 && course.room.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              '@${course.room}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                height: 1.15,
+                                fontSize: 9,
+                                color: foreground.withValues(alpha: 0.86),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Text(
+                        '(${course.startWeek}-${course.endWeek}周)',
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: span == 1 ? 7 : 8,
+                          color: foreground.withValues(alpha: 0.88),
+                        ),
+                      ),
+                    ),
+                    if (active && weather != null)
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: WeatherGlyph(
+                          kind: weatherPresentation(weather!.weatherCode).kind,
+                          size: 13,
+                          animate: !reduceMotion,
+                          color: Colors.white.withValues(alpha: 0.92),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

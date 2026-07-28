@@ -172,6 +172,47 @@ void main() {
       expect(tapped?.course.id, 'stable');
     });
 
+    testWidgets(
+        'weather card layer and explicit effects are mutually exclusive',
+        (tester) async {
+      final weather = YsWeatherSnapshot(
+        current: const YsCurrentWeather(kind: YsWeatherKind.heavyRain),
+        daily: const [
+          YsDailyWeather(date: '2026-03-02', kind: YsWeatherKind.heavyRain),
+        ],
+        updatedAt: DateTime(2026, 3, 2),
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsWeekTimetable(
+            week: 1,
+            courses: courses,
+            termStart: DateTime(2026, 3, 2),
+            weather: weather,
+            reduceMotion: true,
+          ),
+        ),
+      ));
+      expect(find.byType(YsWeatherCardLayer), findsOneWidget);
+      expect(find.byType(YsWeatherGlyph), findsWidgets);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsWeekTimetable(
+            week: 1,
+            courses: courses,
+            termStart: DateTime(2026, 3, 2),
+            weather: weather,
+            cardEffect: YsCardEffect.glow,
+            reduceMotion: true,
+          ),
+        ),
+      ));
+      expect(find.byType(YsWeatherCardLayer), findsNothing);
+      expect(find.byType(YsWeatherGlyph), findsWidgets);
+      expect(ysWeatherLabel(YsWeatherKind.heavyRain), '大雨');
+    });
+
     testWidgets('renders week/day header from termStart', (tester) async {
       await tester.pumpWidget(harness(week: 2));
       await tester.pumpAndSettle();

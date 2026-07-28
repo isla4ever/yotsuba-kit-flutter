@@ -51,7 +51,8 @@ class YsWeekTimetable extends StatefulWidget {
     this.theme = YsScheduleTheme.light,
     this.transition = YsTransition.wave,
     this.density = YsScheduleDensity.normal,
-    this.cardEffect = YsCardEffect.shimmer,
+    this.cardEffect = YsCardEffect.none,
+    this.weatherCardBackground = true,
     this.weather,
     this.reduceMotion = false,
     this.swipeable = true,
@@ -79,6 +80,7 @@ class YsWeekTimetable extends StatefulWidget {
   final YsTransition transition;
   final YsScheduleDensity density;
   final YsCardEffect cardEffect;
+  final bool weatherCardBackground;
   final YsWeatherSnapshot? weather;
   final bool reduceMotion;
   final bool swipeable;
@@ -453,6 +455,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
       makeupBadge: widget.makeupBadge,
       density: widget.density,
       effect: widget.cardEffect,
+      weatherCardBackground: widget.weatherCardBackground,
       reduceMotion: widget.reduceMotion || leaving,
       narrow: dayWidth < 58,
       weather: daily,
@@ -627,6 +630,7 @@ class _CourseCard extends StatelessWidget {
     required this.makeupBadge,
     required this.density,
     required this.effect,
+    required this.weatherCardBackground,
     required this.reduceMotion,
     required this.narrow,
     this.weather,
@@ -640,6 +644,7 @@ class _CourseCard extends StatelessWidget {
   final String makeupBadge;
   final YsScheduleDensity density;
   final YsCardEffect effect;
+  final bool weatherCardBackground;
   final bool reduceMotion;
   final bool narrow;
   final YsDailyWeather? weather;
@@ -656,7 +661,11 @@ class _CourseCard extends StatelessWidget {
         : active
             ? color
             : theme.surface3;
-    final background = weather == null || !active
+    final showWeatherBackground = weather != null &&
+        active &&
+        weatherCardBackground &&
+        effect == YsCardEffect.none;
+    final background = !showWeatherBackground
         ? baseBackground
         : Color.lerp(baseBackground, _weatherAccent(weather!.kind), 0.18)!;
     final foreground = active ? Colors.white : theme.text2;
@@ -749,6 +758,19 @@ class _CourseCard extends StatelessWidget {
             ),
           ),
         ),
+        if (showWeatherBackground)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: YsWeatherCardLayer(
+                  kind: weather!.kind,
+                  theme: theme,
+                  reduceMotion: reduceMotion,
+                ),
+              ),
+            ),
+          ),
         if (active && effect != YsCardEffect.none && !reduceMotion)
           Positioned.fill(
             child: IgnorePointer(
@@ -820,6 +842,7 @@ class _CourseCard extends StatelessWidget {
 Color _weatherAccent(YsWeatherKind kind) => switch (kind) {
       YsWeatherKind.clear => const Color(0xFFFFC857),
       YsWeatherKind.rain ||
+      YsWeatherKind.heavyRain ||
       YsWeatherKind.drizzle ||
       YsWeatherKind.storm =>
         const Color(0xFF5AA9E6),

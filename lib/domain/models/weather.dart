@@ -5,6 +5,7 @@ enum WeatherKind {
   fog,
   drizzle,
   rain,
+  heavyRain,
   storm,
   snow,
   neutral,
@@ -33,7 +34,7 @@ WeatherPresentation weatherPresentation(int code) {
     return WeatherPresentation(WeatherKind.rain, code == 61 ? '小雨' : '中雨');
   }
   if ({65, 66, 67, 82}.contains(code)) {
-    return const WeatherPresentation(WeatherKind.rain, '大雨');
+    return const WeatherPresentation(WeatherKind.heavyRain, '大雨');
   }
   if ({71, 73, 75, 77, 85, 86}.contains(code)) {
     return const WeatherPresentation(WeatherKind.snow, '有雪');

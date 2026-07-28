@@ -125,6 +125,10 @@ List<Color> _sceneColors(WeatherKind kind, AppPalette palette) {
       dark
           ? const [Color(0xFF142432), Color(0xFF171C25), Color(0xFF101319)]
           : const [Color(0xFFD7E5EF), Color(0xFFE2E7ED), Color(0xFFF3F5F8)],
+    WeatherKind.heavyRain =>
+      dark
+          ? const [Color(0xFF0E1C2B), Color(0xFF111923), Color(0xFF101319)]
+          : const [Color(0xFFC4D5E2), Color(0xFFD8E0E7), Color(0xFFF3F5F8)],
     WeatherKind.storm =>
       dark
           ? const [Color(0xFF1B2030), Color(0xFF141822), Color(0xFF101319)]
@@ -160,6 +164,7 @@ class _WeatherScenePainter extends CustomPainter {
       WeatherKind.cloudy,
       WeatherKind.overcast,
       WeatherKind.rain,
+      WeatherKind.heavyRain,
       WeatherKind.drizzle,
       WeatherKind.storm,
       WeatherKind.snow,
@@ -168,10 +173,18 @@ class _WeatherScenePainter extends CustomPainter {
     }
     if ({
       WeatherKind.rain,
+      WeatherKind.heavyRain,
       WeatherKind.drizzle,
       WeatherKind.storm,
     }.contains(kind)) {
-      _paintRain(canvas, size, kind == WeatherKind.drizzle ? 14 : 28);
+      final (count, speed, opacity) = switch (kind) {
+        WeatherKind.drizzle => (14, 0.7, 0.18),
+        WeatherKind.rain => (28, 1.4, 0.26),
+        WeatherKind.heavyRain => (48, 2.25, 0.42),
+        WeatherKind.storm => (38, 1.9, 0.34),
+        _ => (24, 1.0, 0.24),
+      };
+      _paintRain(canvas, size, count, speed: speed, opacity: opacity);
     }
     if (kind == WeatherKind.snow) _paintSnow(canvas, size);
     if (kind == WeatherKind.fog) _paintFog(canvas, size);
@@ -210,16 +223,31 @@ class _WeatherScenePainter extends CustomPainter {
     }
   }
 
-  void _paintRain(Canvas canvas, Size size, int count) {
+  void _paintRain(
+    Canvas canvas,
+    Size size,
+    int count, {
+    required double speed,
+    required double opacity,
+  }) {
     final paint = Paint()
-      ..color = const Color(0xFF8ABDE0).withValues(alpha: 0.25 * intensity)
-      ..strokeWidth = 1.2
+      ..color = const Color(0xFF8ABDE0).withValues(alpha: opacity * intensity)
+      ..strokeWidth = kind == WeatherKind.heavyRain ? 1.7 : 1.2
       ..strokeCap = StrokeCap.round;
     for (var index = 0; index < count; index++) {
       final seed = (index * 47) % 101 / 101;
-      final x = (seed * size.width + progress * 58) % size.width;
-      final y = ((index * 83.0 + progress * size.height * 1.4) % size.height);
-      canvas.drawLine(Offset(x, y), Offset(x - 4, y + 11), paint);
+      final x = (seed * size.width + progress * 58 * speed) % size.width;
+      final y = ((index * 83.0 + progress * size.height * speed) % size.height);
+      final length = kind == WeatherKind.drizzle
+          ? 7.0
+          : kind == WeatherKind.heavyRain
+          ? 16.0
+          : 11.0;
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x - length * 0.36, y + length),
+        paint,
+      );
     }
   }
 
@@ -262,5 +290,88 @@ class _WeatherScenePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WeatherScenePainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.kind != kind;
+  }
+}
+
+class WeatherCardLayer extends StatefulWidget {
+  const WeatherCardLayer({
+    required this.kind,
+    required this.reduceMotion,
+    this.intensity = 0.72,
+    super.key,
+  });
+
+  final WeatherKind kind;
+  final bool reduceMotion;
+  final double intensity;
+
+  @override
+  State<WeatherCardLayer> createState() => _WeatherCardLayerState();
+}
+
+class _WeatherCardLayerState extends State<WeatherCardLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 12),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant WeatherCardLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reduceMotion != widget.reduceMotion) _sync();
+  }
+
+  void _sync() {
+    if (widget.reduceMotion) {
+      _controller.stop();
+      _controller.value = 0.35;
+    } else {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _sceneColors(widget.kind, palette)
+                  .take(2)
+                  .map(
+                    (color) => color.withValues(alpha: 0.34 * widget.intensity),
+                  )
+                  .toList(),
+            ),
+          ),
+          child: CustomPaint(
+            painter: _WeatherScenePainter(
+              kind: widget.kind,
+              progress: _controller.value,
+              palette: palette,
+              intensity: widget.intensity,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

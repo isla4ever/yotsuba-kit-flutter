@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart';
 
+enum _CourseCardStyle { weather, none, shimmer, glow, aurora, breathe }
+
+YsCardEffect _effectFor(_CourseCardStyle style) => switch (style) {
+      _CourseCardStyle.weather || _CourseCardStyle.none => YsCardEffect.none,
+      _CourseCardStyle.shimmer => YsCardEffect.shimmer,
+      _CourseCardStyle.glow => YsCardEffect.glow,
+      _CourseCardStyle.aurora => YsCardEffect.aurora,
+      _CourseCardStyle.breathe => YsCardEffect.breathe,
+    };
+
 void main() => runApp(const YotsubaKitShowcase());
 
 class YotsubaKitShowcase extends StatefulWidget {
@@ -66,7 +76,7 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
   YsHeaderStyle _headerStyle = YsHeaderStyle.standard;
   YsScheduleDensity _density = YsScheduleDensity.normal;
   YsPalette _palette = YsPalette.morandi;
-  YsCardEffect _cardEffect = YsCardEffect.shimmer;
+  _CourseCardStyle _courseCardStyle = _CourseCardStyle.weather;
   YsDetailLayout _detailLayout = YsDetailLayout.standard;
   YsDetailHero _detailHero = YsDetailHero.weather;
   YsSheetPlacement _detailPlacement = YsSheetPlacement.bottom;
@@ -232,7 +242,8 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
       ],
       transition: _transition,
       density: _density,
-      cardEffect: _cardEffect,
+      cardEffect: _effectFor(_courseCardStyle),
+      weatherCardBackground: _courseCardStyle == _CourseCardStyle.weather,
       reduceMotion: _reduceMotion,
       weather: _weather,
       weatherScene: _weatherScene,
@@ -283,7 +294,7 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
         headerStyle: _headerStyle,
         density: _density,
         palette: _palette,
-        cardEffect: _cardEffect,
+        courseCardStyle: _courseCardStyle,
         detailLayout: _detailLayout,
         detailHero: _detailHero,
         detailPlacement: _detailPlacement,
@@ -297,7 +308,8 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
         onHeaderStyleChanged: (value) => setState(() => _headerStyle = value),
         onDensityChanged: (value) => setState(() => _density = value),
         onPaletteChanged: (value) => setState(() => _palette = value),
-        onCardEffectChanged: (value) => setState(() => _cardEffect = value),
+        onCourseCardStyleChanged: (value) =>
+            setState(() => _courseCardStyle = value),
         onDetailLayoutChanged: (value) => setState(() => _detailLayout = value),
         onDetailHeroChanged: (value) => setState(() => _detailHero = value),
         onDetailPlacementChanged: (value) =>
@@ -503,10 +515,10 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
       YsWeatherKind.clear,
       YsWeatherKind.cloudy,
       YsWeatherKind.rain,
-      YsWeatherKind.overcast,
-      YsWeatherKind.clear,
+      YsWeatherKind.heavyRain,
+      YsWeatherKind.storm,
       YsWeatherKind.drizzle,
-      YsWeatherKind.cloudy,
+      YsWeatherKind.snow,
     ];
     return YsWeatherSnapshot(
       current: const YsCurrentWeather(
@@ -536,7 +548,7 @@ class _SettingsPanel extends StatefulWidget {
     required this.headerStyle,
     required this.density,
     required this.palette,
-    required this.cardEffect,
+    required this.courseCardStyle,
     required this.detailLayout,
     required this.detailHero,
     required this.detailPlacement,
@@ -550,7 +562,7 @@ class _SettingsPanel extends StatefulWidget {
     required this.onHeaderStyleChanged,
     required this.onDensityChanged,
     required this.onPaletteChanged,
-    required this.onCardEffectChanged,
+    required this.onCourseCardStyleChanged,
     required this.onDetailLayoutChanged,
     required this.onDetailHeroChanged,
     required this.onDetailPlacementChanged,
@@ -566,7 +578,7 @@ class _SettingsPanel extends StatefulWidget {
   final YsHeaderStyle headerStyle;
   final YsScheduleDensity density;
   final YsPalette palette;
-  final YsCardEffect cardEffect;
+  final _CourseCardStyle courseCardStyle;
   final YsDetailLayout detailLayout;
   final YsDetailHero detailHero;
   final YsSheetPlacement detailPlacement;
@@ -580,7 +592,7 @@ class _SettingsPanel extends StatefulWidget {
   final ValueChanged<YsHeaderStyle> onHeaderStyleChanged;
   final ValueChanged<YsScheduleDensity> onDensityChanged;
   final ValueChanged<YsPalette> onPaletteChanged;
-  final ValueChanged<YsCardEffect> onCardEffectChanged;
+  final ValueChanged<_CourseCardStyle> onCourseCardStyleChanged;
   final ValueChanged<YsDetailLayout> onDetailLayoutChanged;
   final ValueChanged<YsDetailHero> onDetailHeroChanged;
   final ValueChanged<YsSheetPlacement> onDetailPlacementChanged;
@@ -600,7 +612,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   late YsHeaderStyle headerStyle = widget.headerStyle;
   late YsScheduleDensity density = widget.density;
   late YsPalette palette = widget.palette;
-  late YsCardEffect cardEffect = widget.cardEffect;
+  late _CourseCardStyle courseCardStyle = widget.courseCardStyle;
   late YsDetailLayout detailLayout = widget.detailLayout;
   late YsDetailHero detailHero = widget.detailHero;
   late YsSheetPlacement detailPlacement = widget.detailPlacement;
@@ -647,10 +659,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           setState(() => palette = value);
           widget.onPaletteChanged(value);
         }),
-        _dropdown('卡片特效', cardEffect, YsCardEffect.values, _effectLabel,
-            (value) {
-          setState(() => cardEffect = value);
-          widget.onCardEffectChanged(value);
+        _dropdown('课程卡表现', courseCardStyle, _CourseCardStyle.values,
+            _courseCardStyleLabel, (value) {
+          setState(() => courseCardStyle = value);
+          widget.onCourseCardStyleChanged(value);
         }),
         _dropdown('显示星期', visibleDays, const [5, 6, 7], (value) => '$value 天',
             (value) {
@@ -789,12 +801,13 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         YsPalette.sunset => '日落',
       };
 
-  String _effectLabel(YsCardEffect value) => switch (value) {
-        YsCardEffect.none => '无',
-        YsCardEffect.shimmer => '流光',
-        YsCardEffect.glow => '微光',
-        YsCardEffect.aurora => '极光',
-        YsCardEffect.breathe => '呼吸',
+  String _courseCardStyleLabel(_CourseCardStyle value) => switch (value) {
+        _CourseCardStyle.weather => '实时天气',
+        _CourseCardStyle.none => '无',
+        _CourseCardStyle.shimmer => '微光',
+        _CourseCardStyle.glow => '辉光',
+        _CourseCardStyle.aurora => '极光',
+        _CourseCardStyle.breathe => '呼吸',
       };
 
   String _detailLabel(YsDetailLayout value) => switch (value) {

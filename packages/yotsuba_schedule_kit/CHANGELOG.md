@@ -4,7 +4,8 @@
 
 - Added structured `materialDetails`, `books`, and `tasks` while retaining legacy string `materials`.
 - Enabled weather-aware course card glyphs/tints, weekday forecasts, weather detail heroes, and scenes by default.
-- Made `shimmer` the default card effect and kept all visual effects configurable.
+- Added distinct animated glyphs, scenes, and course-card layers for clear, cloudy, overcast, fog, drizzle, rain, heavy rain, storm, and snow.
+- Made real-time weather the default course-card presentation; explicit shimmer, glow, aurora, and breathe effects automatically replace the weather layer while preserving the weather glyph.
 - Added configurable empty-value text while preserving detail labels for missing information.
 - Added animated overlap-course detail transitions within the same adaptive sheet.
 - Reworked Today for mobile whole-card dragging, four-corner resizing, course tasks, structured carry lists, and custom builders.
