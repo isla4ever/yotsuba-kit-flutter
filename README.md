@@ -1,8 +1,28 @@
 # Yotsuba Kit Flutter
 
-Yotsuba 课表的 Flutter 开源实现。仓库同时包含一个完整离线课表应用、一个可发布到 pub.dev 的组件依赖，以及只使用依赖公开 API 的演示项目。
+Yotsuba Kit Flutter 是面向中国高校课表与课程日程产品的 Flutter 开源实现。仓库同时提供可复用组件包、只依赖公开 API 的示例工程，以及具备离线数据与系统能力的完整应用。
 
-它与 Vue、React 和 Web Components 版本使用同一能力模型，但界面遵循 Flutter 原生交互：Material 控件、自适应底部 / 居中 / 右侧弹层、系统减少动态效果，以及长按进入 Today 布局编辑。
+它与 Web 版本共享课程、学期、天气、详情、弹层和 Today 的产品语义，同时保持 Flutter 原生实现：Material 控件、自适应弹层、系统减少动态效果，以及面向触摸的 Today 布局编辑。
+
+## 快速入口
+
+| 入口 | 地址 | 说明 |
+| --- | --- | --- |
+| **Flutter 组件包** | [pub.dev/packages/yotsuba_schedule_kit](https://pub.dev/packages/yotsuba_schedule_kit) | 安装说明、版本与包元数据 |
+| **Flutter 接入文档** | [官网 Flutter 指南](https://isla4ever.github.io/yotsuba-kit/frameworks/flutter.html) | 数据模型、天气、Today 与平台能力边界 |
+| **组件示例源码** | [`packages/yotsuba_schedule_kit/example/`](packages/yotsuba_schedule_kit/example) | 只使用组件包公开 API 的课表 / Today 示例 |
+| **完整应用源码** | [`lib/`](lib) | 离线课表、计划、天气、导入导出与系统集成 |
+| **在线 Web 示例** | [iyotsuba.top](https://iyotsuba.top/) | 快速了解跨框架一致的产品与交互模型 |
+| **完整官网文档** | [isla4ever.github.io/yotsuba-kit](https://isla4ever.github.io/yotsuba-kit/) | Web 与 Flutter 的统一能力说明 |
+
+## 如何选择
+
+| 目标 | 使用内容 |
+| --- | --- |
+| 在现有 Flutter 应用中嵌入课表或 Today | `yotsuba_schedule_kit` 组件包 |
+| 学习组件的标准接入方式 | `packages/yotsuba_schedule_kit/example/` |
+| 参考离线存储、定位天气、分享和系统日历等完整链路 | 根目录完整应用 |
+| 对照 Vue、React 与原生 H5 实现 | [yotsuba-kit-playground](https://github.com/isla4ever/yotsuba-kit-playground) |
 
 ## Yotsuba 项目关系
 
@@ -11,8 +31,6 @@ Yotsuba 课表的 Flutter 开源实现。仓库同时包含一个完整离线课
 | **[yotsuba-kit](https://github.com/isla4ever/yotsuba-kit)** | Web 主体组件库、NPM 包和文档官网 |
 | **[yotsuba-kit-playground](https://github.com/isla4ever/yotsuba-kit-playground)** | Vue / React / 原生 Web 演示与依赖消费验证 |
 | **[yotsuba-kit-flutter](https://github.com/isla4ever/yotsuba-kit-flutter)** | 当前仓库：Flutter 组件包、完整应用和 Flutter 演示 |
-
-文档官网：[isla4ever.github.io/yotsuba-kit](https://isla4ever.github.io/yotsuba-kit/)；Flutter 包：[pub.dev/packages/yotsuba_schedule_kit](https://pub.dev/packages/yotsuba_schedule_kit)。
 
 ## 仓库组成
 
