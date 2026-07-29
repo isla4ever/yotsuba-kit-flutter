@@ -13,12 +13,12 @@ class _Wave {
   static const rowStepMs = 7;
   static const maxDelayMs = 210;
   static const enterMs = 260;
-  static const leaveMs = 200;
-  static const leaveLagMs = 60;
+  static const leaveMs = 260;
+  static const leaveLagMs = 0;
   static const totalMs = 500;
 
   static const enterCurve = Cubic(0.22, 0.61, 0.36, 1);
-  static const leaveCurve = Cubic(0.4, 0, 0.6, 1);
+  static const leaveCurve = enterCurve;
 
   static int delayMs({
     required int weekday,

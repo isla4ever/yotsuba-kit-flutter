@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2
+
+- Matched wave enter and leave timing so changing weather cards cross-fade without a brightness jump.
+- Preserved stable cells and inactive overlap layering while smoothing the remaining animated card transitions.
+
 ## 0.7.1
 
 - Prevented inactive leaving overlap cards from showing through while a new active course animates into the same timetable slot.

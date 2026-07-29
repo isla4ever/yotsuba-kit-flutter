@@ -2,7 +2,7 @@ name: yotsuba_schedule_kit
 description: >-
   面向中国大学课表场景的 Flutter 组件库，包含学期规则、七种换周动效、天气联动课程详情、
   自适应弹层、主题，以及可拖动和四角缩放的 Today 模块。
-version: 0.7.1
+version: 0.7.2
 homepage: https://isla4ever.github.io/yotsuba-kit/
 repository: https://github.com/isla4ever/yotsuba-kit-flutter
 

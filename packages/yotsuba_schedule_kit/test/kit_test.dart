@@ -155,6 +155,56 @@ void main() {
       expect(find.text('非本周'), findsOneWidget);
     });
 
+    testWidgets('wave cross-fade keeps changing card opacity complementary',
+        (tester) async {
+      const changing = [
+        YsCourse(
+          id: 'week-one',
+          name: '第一周课程',
+          weekday: 1,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 1,
+        ),
+        YsCourse(
+          id: 'week-two',
+          name: '第二周课程',
+          weekday: 1,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 2,
+          endWeek: 2,
+        ),
+      ];
+      var week = 1;
+      late StateSetter setOuter;
+      await tester.pumpWidget(MaterialApp(
+        home: StatefulBuilder(builder: (context, setState) {
+          setOuter = setState;
+          return Scaffold(
+            body: YsWeekTimetable(
+              week: week,
+              courses: changing,
+              cardEffect: YsCardEffect.none,
+            ),
+          );
+        }),
+      ));
+
+      setOuter(() => week = 2);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 240));
+
+      final crossFade = tester
+          .widgetList<Opacity>(find.byType(Opacity))
+          .map((widget) => widget.opacity)
+          .where((opacity) => opacity > 0.001 && opacity < 0.999)
+          .toList();
+      expect(crossFade, hasLength(2));
+      expect(crossFade[0] + crossFade[1], closeTo(1, 0.001));
+    });
+
     testWidgets(
         'wave never reveals an inactive leaving overlap above a new active course',
         (tester) async {

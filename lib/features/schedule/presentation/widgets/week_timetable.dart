@@ -12,19 +12,19 @@ import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dar
 
 /// 波浪覆盖换周：骨架（表头、时间轴、格线）常驻不动，旧周课程留在下层，
 /// 新周课程按“列为主、节次为辅”的对角线次序覆盖上来，任何一帧都不出现空网格。
-/// 换周前后视觉不变的格子完全静止，不参与动画；旧卡晚于新卡起淡出，两层始终交叠。
+/// 换周前后视觉不变的格子完全静止，不参与动画；变化卡片以互补透明度交叉淡入淡出。
 class _Wave {
   static const colStepMs = 30;
   static const rowStepMs = 7;
   static const maxDelayMs = 210;
   static const enterMs = 260;
-  static const leaveMs = 200;
-  static const leaveLagMs = 60;
+  static const leaveMs = 260;
+  static const leaveLagMs = 0;
   static const totalMs = 500;
   static const headerMs = 240;
 
   static const enterCurve = Cubic(0.22, 0.61, 0.36, 1);
-  static const leaveCurve = Cubic(0.4, 0, 0.6, 1);
+  static const leaveCurve = enterCurve;
 
   static int delayMs({
     required int weekday,
