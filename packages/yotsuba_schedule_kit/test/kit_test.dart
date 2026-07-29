@@ -229,6 +229,317 @@ void main() {
       expect(ysWeatherLabel(YsWeatherKind.heavyRain), '大雨');
     });
 
+    testWidgets(
+        'inactive course weather is desaturated instead of recoloring the card',
+        (tester) async {
+      final weather = YsWeatherSnapshot(
+        daily: const [
+          YsDailyWeather(date: '2026-03-12', kind: YsWeatherKind.clear),
+        ],
+        updatedAt: DateTime(2026, 3, 9),
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsWeekTimetable(
+            week: 2,
+            courses: const [
+              YsCourse(
+                id: 'inactive-weather',
+                name: '非本周课程',
+                weekday: 4,
+                startSection: 1,
+                endSection: 2,
+                startWeek: 1,
+                endWeek: 1,
+              ),
+            ],
+            termStart: DateTime(2026, 3, 2),
+            weather: weather,
+            reduceMotion: true,
+          ),
+        ),
+      ));
+
+      expect(find.text('非本周'), findsOneWidget);
+      expect(find.byType(YsWeatherCardLayer), findsOneWidget);
+      final mutedOpacity = find.ancestor(
+        of: find.byType(YsWeatherCardLayer),
+        matching: find.byType(Opacity),
+      );
+      expect(find.byType(ColorFiltered), findsOneWidget);
+      expect(tester.widget<Opacity>(mutedOpacity.first).opacity, 0.16);
+    });
+
+    testWidgets('same-day courses use weather from their own start time',
+        (tester) async {
+      const sameDayCourses = [
+        YsCourse(
+          id: 'morning',
+          name: '晨间课程',
+          weekday: 1,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 20,
+        ),
+        YsCourse(
+          id: 'afternoon',
+          name: '午后课程',
+          weekday: 1,
+          startSection: 5,
+          endSection: 6,
+          startWeek: 1,
+          endWeek: 20,
+        ),
+      ];
+      final weather = YsWeatherSnapshot(
+        daily: const [
+          YsDailyWeather(date: '2026-03-02', kind: YsWeatherKind.cloudy),
+        ],
+        hourly: [
+          YsHourlyWeather(
+            time: DateTime(2026, 3, 2, 8),
+            kind: YsWeatherKind.clear,
+            temperatureC: 24,
+          ),
+          YsHourlyWeather(
+            time: DateTime(2026, 3, 2, 15),
+            kind: YsWeatherKind.snow,
+            temperatureC: 2,
+          ),
+        ],
+        updatedAt: DateTime(2026, 3, 2),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: YsWeekTimetable(
+              week: 1,
+              courses: sameDayCourses,
+              termStart: DateTime(2026, 3, 2),
+              weather: weather,
+              reduceMotion: true,
+            ),
+          ),
+        ),
+      );
+
+      final kinds = tester
+          .widgetList<YsWeatherCardLayer>(find.byType(YsWeatherCardLayer))
+          .map((layer) => layer.kind)
+          .toList();
+      expect(kinds, [YsWeatherKind.clear, YsWeatherKind.snow]);
+    });
+
+    testWidgets('Saturday and Sunday cards keep their hourly weather',
+        (tester) async {
+      const weekendCourses = [
+        YsCourse(
+          id: 'saturday',
+          name: '周六课程',
+          weekday: 6,
+          startSection: 3,
+          endSection: 4,
+          startWeek: 1,
+          endWeek: 20,
+        ),
+        YsCourse(
+          id: 'sunday',
+          name: '周日课程',
+          weekday: 7,
+          startSection: 5,
+          endSection: 6,
+          startWeek: 1,
+          endWeek: 20,
+        ),
+      ];
+      final weather = YsWeatherSnapshot(
+        daily: const [
+          YsDailyWeather(date: '2026-03-07', kind: YsWeatherKind.cloudy),
+          YsDailyWeather(date: '2026-03-08', kind: YsWeatherKind.rain),
+        ],
+        hourly: [
+          YsHourlyWeather(
+            time: DateTime(2026, 3, 7, 10),
+            kind: YsWeatherKind.storm,
+          ),
+          YsHourlyWeather(
+            time: DateTime(2026, 3, 8, 14, 30),
+            kind: YsWeatherKind.snow,
+          ),
+        ],
+        updatedAt: DateTime(2026, 3, 2),
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsWeekTimetable(
+            week: 1,
+            courses: weekendCourses,
+            termStart: DateTime(2026, 3, 2),
+            weather: weather,
+            reduceMotion: true,
+          ),
+        ),
+      ));
+
+      final kinds = tester
+          .widgetList<YsWeatherCardLayer>(find.byType(YsWeatherCardLayer))
+          .map((layer) => layer.kind)
+          .toList();
+      expect(kinds, [YsWeatherKind.storm, YsWeatherKind.snow]);
+    });
+
+    testWidgets('long course names and rooms use bounded ellipsis',
+        (tester) async {
+      const name = '面向复杂真实世界系统的跨学科创新设计与工程实践课程';
+      const room = '国际联合创新实验教学中心东区综合实践楼超长教室名称';
+      const course = YsCourse(
+        id: 'long-copy',
+        name: name,
+        location: room,
+        weekday: 1,
+        startSection: 1,
+        endSection: 2,
+        startWeek: 1,
+        endWeek: 16,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: YsWeekTimetable(
+            week: 1,
+            courses: const [course],
+            termStart: DateTime(2026, 3, 2),
+            reduceMotion: true,
+          ),
+        ),
+      ));
+
+      final nameText = tester.widget<Text>(find.text(name));
+      final roomText = tester.widget<Text>(find.text('@$room'));
+      expect(nameText.maxLines, 3);
+      expect(roomText.maxLines, 2);
+      expect(nameText.overflow, TextOverflow.ellipsis);
+      expect(roomText.overflow, TextOverflow.ellipsis);
+      expect(tester.takeException(), isNull);
+    });
+
+    test('weather lookup reuses its indexed nearest-hour result', () {
+      final weather = YsWeatherSnapshot(
+        daily: const [
+          YsDailyWeather(date: '2026-03-02', kind: YsWeatherKind.cloudy),
+        ],
+        hourly: [
+          YsHourlyWeather(
+            time: DateTime(2026, 3, 2, 8),
+            kind: YsWeatherKind.clear,
+          ),
+        ],
+        updatedAt: DateTime(2026, 3, 2),
+      );
+      final target = DateTime(2026, 3, 2, 8, 20);
+      final first = weather.weatherForDateTime(target);
+      final second = weather.weatherForDateTime(target);
+      expect(identical(first, second), isTrue);
+    });
+
+    testWidgets('density tiers progressively reveal header and card details',
+        (tester) async {
+      const tierCourse = YsCourse(
+        id: 'tier',
+        name: '交互设计',
+        teacher: '陈老师',
+        location: '创新楼 B12',
+        weekday: 1,
+        startSection: 1,
+        endSection: 2,
+        startWeek: 1,
+        endWeek: 16,
+        materials: ['电脑'],
+      );
+      final weather = YsWeatherSnapshot(
+        daily: const [
+          YsDailyWeather(
+            date: '2026-03-02',
+            kind: YsWeatherKind.clear,
+            lowC: 22,
+            highC: 28,
+          ),
+        ],
+        updatedAt: DateTime(2026, 3, 2),
+      );
+
+      Widget timetable(YsScheduleDensity density) => MaterialApp(
+            home: Scaffold(
+              body: YsWeekTimetable(
+                week: 1,
+                courses: const [tierCourse],
+                termStart: DateTime(2026, 3, 2),
+                weather: weather,
+                density: density,
+                reduceMotion: true,
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(timetable(YsScheduleDensity.minimal));
+      expect(find.byType(YsWeatherGlyph), findsNothing);
+      expect(find.text('@创新楼 B12'), findsNothing);
+      expect(find.text('陈老师'), findsNothing);
+      expect(find.text('带'), findsNothing);
+
+      await tester.pumpWidget(timetable(YsScheduleDensity.normal));
+      expect(find.byType(YsWeatherGlyph), findsOneWidget);
+      expect(find.text('@创新楼 B12'), findsOneWidget);
+      expect(find.text('28°'), findsNothing);
+      expect(find.text('陈老师'), findsNothing);
+
+      await tester.pumpWidget(timetable(YsScheduleDensity.rich));
+      expect(find.byType(YsWeatherGlyph), findsOneWidget);
+      expect(find.text('28°'), findsOneWidget);
+      expect(find.text('陈老师'), findsOneWidget);
+      expect(find.text('带'), findsOneWidget);
+    });
+
+    testWidgets('rich density keeps the carry hint inside narrow course cards',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      const course = YsCourse(
+        id: 'narrow-rich',
+        name: '交互设计',
+        teacher: '陈老师',
+        weekday: 1,
+        startSection: 1,
+        endSection: 2,
+        startWeek: 1,
+        endWeek: 16,
+        materials: ['电脑'],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: YsWeekTimetable(
+              week: 1,
+              courses: const [course],
+              termStart: DateTime(2026, 3, 2),
+              density: YsScheduleDensity.rich,
+              rowHeight: 66,
+              reduceMotion: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('带'), findsOneWidget);
+      expect(find.text('陈老师'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('renders week/day header from termStart', (tester) async {
       await tester.pumpWidget(harness(week: 2));
       await tester.pumpAndSettle();
@@ -326,10 +637,48 @@ void main() {
       expect(find.text('地点'), findsOneWidget);
       expect(find.text('地点待定'), findsOneWidget);
       expect(find.text('教师'), findsOneWidget);
-      expect(find.text('天气'), findsOneWidget);
+      expect(find.text('天气'), findsNothing);
       expect(find.text('课本'), findsOneWidget);
       expect(find.text('课程任务'), findsOneWidget);
-      expect(find.text('未填写'), findsNWidgets(5));
+      expect(find.text('未填写'), findsNWidgets(4));
+    });
+
+    testWidgets('course detail puts animated weather and temperature in hero',
+        (tester) async {
+      const course = YsCourse(
+        id: 'weather-detail',
+        name: '大学物理',
+        weekday: 2,
+        startSection: 3,
+        endSection: 4,
+        startWeek: 1,
+        endWeek: 16,
+      );
+      const display = YsDisplayCourse(
+        course: course,
+        displayId: 'weather-detail-display',
+        weekday: 2,
+        active: true,
+      );
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: YsCourseDetailPanel(
+            course: display,
+            weather: YsDailyWeather(
+              date: '2026-03-03',
+              kind: YsWeatherKind.rain,
+              lowC: 21,
+              highC: 27,
+              label: '中雨',
+            ),
+          ),
+        ),
+      ));
+
+      expect(find.byType(YsWeatherGlyph), findsOneWidget);
+      expect(find.text('21~27°'), findsOneWidget);
+      expect(find.text('中雨'), findsOneWidget);
+      expect(find.text('天气'), findsNothing);
     });
 
     testWidgets('overlap selection animates into course detail',
@@ -544,6 +893,73 @@ void main() {
       await tester.pump();
       expect(find.byKey(const ValueKey('week-glance-chart')), findsNothing);
       expect(find.text('课程块'), findsOneWidget);
+    });
+
+    testWidgets('Today weather has a distinct layout for every grid size',
+        (tester) async {
+      final weather = YsWeatherSnapshot(
+        current: const YsCurrentWeather(
+          kind: YsWeatherKind.clear,
+          temperatureC: 27,
+          label: '晴',
+        ),
+        daily: const [
+          YsDailyWeather(
+            date: '2026-03-02',
+            kind: YsWeatherKind.clear,
+            lowC: 22,
+            highC: 31,
+          ),
+        ],
+        hourly: [
+          for (var index = 0; index < 6; index++)
+            YsHourlyWeather(
+              time: DateTime(2026, 3, 2, 8 + index * 2),
+              kind: index.isEven ? YsWeatherKind.clear : YsWeatherKind.cloudy,
+              temperatureC: 24 + index.toDouble(),
+            ),
+        ],
+        updatedAt: DateTime(2026, 3, 2),
+      );
+
+      Widget buildWeather(YsTodayWidgetSize size) => MaterialApp(
+            home: Scaffold(
+              body: YsToday(
+                courses: courses,
+                termStart: DateTime(2026, 3, 2),
+                now: DateTime(2026, 3, 2, 9),
+                weather: weather,
+                weatherScene: false,
+                widgets: [
+                  YsTodayWidgetConfig(
+                    id: YsTodayWidgetIds.weather,
+                    size: size,
+                  ),
+                ],
+                reduceMotion: true,
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(buildWeather(YsTodayWidgetSize.oneByOne));
+      expect(
+          find.byKey(const ValueKey('today-weather-compact')), findsOneWidget);
+
+      await tester.pumpWidget(buildWeather(YsTodayWidgetSize.twoByOne));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('today-weather-wide')), findsOneWidget);
+
+      await tester.pumpWidget(buildWeather(YsTodayWidgetSize.oneByTwo));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('today-weather-tall')), findsOneWidget);
+
+      await tester.pumpWidget(buildWeather(YsTodayWidgetSize.twoByTwo));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('today-weather-large')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('today-weather-hourly-chart')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('Today drags the whole card to reorder widgets',

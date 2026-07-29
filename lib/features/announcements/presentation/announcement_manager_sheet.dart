@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/local_announcement.dart';
 import 'package:yotsuba_schedule/features/announcements/application/local_announcement_controller.dart';
@@ -11,6 +12,7 @@ Future<void> showAnnouncementManagerSheet(BuildContext context) {
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    sheetAnimationStyle: appModalAnimationStyle,
     builder: (context) => const _AnnouncementManagerSheet(),
   );
 }
@@ -111,6 +113,7 @@ class _AnnouncementManagerSheet extends ConsumerWidget {
     var publish = initial?.published ?? false;
     final submitted = await showDialog<bool>(
       context: context,
+      animationStyle: appModalAnimationStyle,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(initial == null ? '新建公告' : '编辑公告'),

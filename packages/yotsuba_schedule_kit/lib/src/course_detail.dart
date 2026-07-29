@@ -221,7 +221,11 @@ class YsCourseDetailPanel extends StatelessWidget {
     );
     return Column(
       children: [
-        _hero(color),
+        _hero(
+          context,
+          color,
+          showWeather: fields.contains(YsDetailField.weather),
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
@@ -241,18 +245,6 @@ class YsCourseDetailPanel extends StatelessWidget {
                   Icons.person_outline,
                   '教师',
                   _valueOrEmpty(course.course.teacher, YsDetailField.teacher),
-                ),
-              if (fields.contains(YsDetailField.weather))
-                _row(
-                  weather == null
-                      ? Icons.cloud_outlined
-                      : ysWeatherIcon(weather!.kind),
-                  '天气',
-                  weather == null
-                      ? _emptyFor(YsDetailField.weather)
-                      : '${weather!.label ?? ysWeatherLabel(weather!.kind)}'
-                          '${weather!.lowC == null ? '' : ' ${weather!.lowC!.round()}°'}'
-                          '${weather!.highC == null ? '' : ' / ${weather!.highC!.round()}°'}',
                 ),
               if (fields.contains(YsDetailField.note))
                 _section(
@@ -305,7 +297,11 @@ class YsCourseDetailPanel extends StatelessWidget {
     );
   }
 
-  Widget _hero(Color color) {
+  Widget _hero(
+    BuildContext context,
+    Color color, {
+    required bool showWeather,
+  }) {
     final content = Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: Row(
@@ -354,12 +350,7 @@ class YsCourseDetailPanel extends StatelessWidget {
               ],
             ),
           ),
-          if (weather != null)
-            YsWeatherGlyph(
-              kind: weather!.kind,
-              size: 28,
-              color: theme.text2,
-            ),
+          if (showWeather && weather != null) _heroWeather(context),
         ],
       ),
     );
@@ -379,6 +370,57 @@ class YsCourseDetailPanel extends StatelessWidget {
         ),
       _ => ColoredBox(color: theme.surface2, child: content),
     };
+  }
+
+  Widget _heroWeather(BuildContext context) {
+    final value = weather!;
+    return Semantics(
+      label:
+          '${value.label ?? ysWeatherLabel(value.kind)}，${_weatherTemperature()}',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          YsWeatherGlyph(
+            kind: value.kind,
+            size: 31,
+            animate: !MediaQuery.disableAnimationsOf(context),
+            color: theme.text2,
+          ),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _weatherTemperature(),
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  color: theme.text1,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                value.label ?? ysWeatherLabel(value.kind),
+                style: TextStyle(fontSize: 9, color: theme.text3),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _weatherTemperature() {
+    final value = weather!;
+    if (value.lowC != null && value.highC != null) {
+      if (value.lowC == value.highC) {
+        return '${value.highC!.round()}°';
+      }
+      return '${value.lowC!.round()}~${value.highC!.round()}°';
+    }
+    final temperature = value.highC ?? value.lowC;
+    return temperature == null ? '--°' : '${temperature.round()}°';
   }
 
   Widget _row(IconData icon, String label, String value) {

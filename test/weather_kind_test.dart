@@ -10,4 +10,37 @@ void main() {
     expect(weatherPresentation(82).kind, WeatherKind.heavyRain);
     expect(weatherPresentation(95).kind, WeatherKind.storm);
   });
+
+  test('hourly weather survives cache serialization', () {
+    final snapshot = WeatherSnapshot(
+      latitude: 39.1,
+      longitude: 117.2,
+      timezone: 'Asia/Shanghai',
+      currentTemperature: 24,
+      currentWeatherCode: 1,
+      fetchedAt: DateTime(2026, 7, 28, 8),
+      daily: const [
+        DailyWeather(
+          dateKey: '2026-07-28',
+          weatherCode: 1,
+          temperatureMax: 29,
+          temperatureMin: 22,
+        ),
+      ],
+      hourly: [
+        HourlyWeather(
+          time: DateTime(2026, 7, 28, 15),
+          weatherCode: 71,
+          temperature: 2,
+        ),
+      ],
+    );
+
+    final restored = WeatherSnapshot.fromJson(snapshot.toJson());
+    expect(restored.hourly.single.weatherCode, 71);
+    final first = restored.weatherForDateTime(DateTime(2026, 7, 28, 14, 30));
+    final second = restored.weatherForDateTime(DateTime(2026, 7, 28, 14, 30));
+    expect(first?.temperatureMax, 2);
+    expect(identical(first, second), isTrue);
+  });
 }

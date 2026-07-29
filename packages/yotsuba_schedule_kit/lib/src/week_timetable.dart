@@ -115,6 +115,12 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
   late final AnimationController _wave;
   late YsCourseColorResolver _colors = YsCourseColorResolver(widget.theme);
 
+  double get _resolvedHeaderHeight => switch (widget.density) {
+        YsScheduleDensity.minimal => 48,
+        YsScheduleDensity.normal => YsWeekTimetable.headerHeight,
+        YsScheduleDensity.rich => 68,
+      };
+
   @override
   void initState() {
     super.initState();
@@ -228,7 +234,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
     final theme = widget.theme;
     final now = DateTime.now();
     return Container(
-      height: YsWeekTimetable.headerHeight,
+      height: _resolvedHeaderHeight,
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.border)),
       ),
@@ -264,7 +270,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
         : widget.weather?.weatherForDate(formatDateKey(date));
     return SizedBox(
       width: dayWidth,
-      height: YsWeekTimetable.headerHeight,
+      height: _resolvedHeaderHeight,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap:
@@ -287,7 +293,7 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
                   '${date.month}/${date.day}',
                   style: TextStyle(fontSize: 9, color: theme.text3),
                 ),
-              if (daily != null)
+              if (daily != null && widget.density != YsScheduleDensity.minimal)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -297,7 +303,8 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
                       animate: !widget.reduceMotion,
                       color: isToday ? theme.accent : theme.text3,
                     ),
-                    if (daily.highC != null) ...[
+                    if (widget.density == YsScheduleDensity.rich &&
+                        daily.highC != null) ...[
                       const SizedBox(width: 2),
                       Text(
                         '${daily.highC!.round()}°',
@@ -445,9 +452,15 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
     final date = widget.termStart == null
         ? null
         : dateFor(widget.termStart!, cell.week, course.weekday);
-    final daily = date == null
+    final startTime = course.course.startSection <= widget.courseTimes.length
+        ? widget.courseTimes[course.course.startSection - 1].start
+        : null;
+    final courseDateTime = date == null || startTime == null
         ? null
-        : widget.weather?.weatherForDate(formatDateKey(date));
+        : _atCourseTime(date, startTime);
+    final daily = courseDateTime == null
+        ? null
+        : widget.weather?.weatherForDateTime(courseDateTime);
 
     Widget child = _CourseCard(
       cell: cell,
@@ -601,6 +614,13 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
   }
 }
 
+DateTime _atCourseTime(DateTime date, String time) {
+  final parts = time.split(':');
+  final hour = int.tryParse(parts.first) ?? 0;
+  final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+  return DateTime(date.year, date.month, date.day, hour, minute);
+}
+
 /// 一个格位在某周的显示快照（顶卡 + 重叠数），用于新旧对比与稳定判定。
 class _CellView {
   _CellView({required this.group, required this.week});
@@ -666,12 +686,48 @@ class _CourseCard extends StatelessWidget {
         : active
             ? color
             : theme.surface3;
-    final showWeatherBackground = weather != null &&
-        active &&
-        weatherCardBackground &&
-        effect == YsCardEffect.none;
+    final showWeatherBackground =
+        weather != null && weatherCardBackground && effect == YsCardEffect.none;
     final background = baseBackground;
     final foreground = active ? Colors.white : theme.text2;
+    Widget? weatherLayer;
+    if (showWeatherBackground) {
+      weatherLayer = YsWeatherCardLayer(
+        kind: weather!.kind,
+        theme: theme,
+        reduceMotion: reduceMotion,
+      );
+      if (!active) {
+        weatherLayer = Opacity(
+          opacity: 0.16,
+          child: ColorFiltered(
+            colorFilter: const ColorFilter.matrix([
+              0.2126,
+              0.7152,
+              0.0722,
+              0,
+              0,
+              0.2126,
+              0.7152,
+              0.0722,
+              0,
+              0,
+              0.2126,
+              0.7152,
+              0.0722,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+            ]),
+            child: weatherLayer,
+          ),
+        );
+      }
+    }
 
     return Padding(
       padding: EdgeInsets.all(narrow ? 2 : 3),
@@ -692,85 +748,124 @@ class _CourseCard extends StatelessWidget {
             ),
             child: InkWell(
               onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 5, 4, 14),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (status.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
-                        margin: const EdgeInsets.only(bottom: 3),
-                        decoration: BoxDecoration(
-                          color: active
-                              ? Colors.black.withValues(alpha: 0.34)
-                              : theme.surface1,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          status,
-                          style: TextStyle(
-                            fontSize: narrow ? 6 : 7,
-                            fontWeight: FontWeight.w800,
-                            color: active ? Colors.white : theme.text1,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = narrow || constraints.maxHeight < 104;
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(4, 5, 4, compact ? 13 : 14),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: compact ? 9 : 12),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (status.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              margin: const EdgeInsets.only(bottom: 3),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? Colors.black.withValues(alpha: 0.34)
+                                    : theme.surface1,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: compact ? 6 : 7,
+                                  fontWeight: FontWeight.w800,
+                                  color: active ? Colors.white : theme.text1,
+                                ),
+                              ),
+                            ),
+                          Text(
+                            course.course.name,
+                            maxLines: compact ? 2 : 3,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              height: compact ? 1.08 : 1.2,
+                              fontSize: compact ? 8 : 11,
+                              fontWeight: FontWeight.w800,
+                              color: foreground,
+                            ),
                           ),
-                        ),
-                      ),
-                    Text(
-                      course.course.name,
-                      maxLines: narrow
-                          ? 5
-                          : (density == YsScheduleDensity.minimal ? 4 : 3),
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        height: narrow ? 1.05 : 1.2,
-                        fontSize: narrow ? 8 : 11,
-                        fontWeight: FontWeight.w800,
-                        color: foreground,
+                          if (!compact &&
+                              density != YsScheduleDensity.minimal &&
+                              course.course.location != null)
+                            Text(
+                              '@${course.course.location}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: foreground.withValues(alpha: 0.86),
+                              ),
+                            ),
+                          if (density == YsScheduleDensity.rich &&
+                              ((!compact && course.course.teacher != null) ||
+                                  course.course.carryItems.isNotEmpty))
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (!compact && course.course.teacher != null)
+                                  Flexible(
+                                    child: Text(
+                                      course.course.teacher!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        color:
+                                            foreground.withValues(alpha: 0.78),
+                                      ),
+                                    ),
+                                  ),
+                                if (!compact &&
+                                    course.course.teacher != null &&
+                                    course.course.carryItems.isNotEmpty)
+                                  const SizedBox(width: 3),
+                                if (course.course.carryItems.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.86),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      '带',
+                                      style: TextStyle(
+                                        height: 1,
+                                        fontSize: 7,
+                                        fontWeight: FontWeight.w800,
+                                        color: color,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                        ],
                       ),
                     ),
-                    if (!narrow &&
-                        density != YsScheduleDensity.minimal &&
-                        course.course.location != null)
-                      Text(
-                        '@${course.course.location}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: foreground.withValues(alpha: 0.86),
-                        ),
-                      ),
-                    if (!narrow &&
-                        density == YsScheduleDensity.rich &&
-                        course.course.teacher != null)
-                      Text(
-                        course.course.teacher!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: narrow ? 6 : 8,
-                          color: foreground.withValues(alpha: 0.78),
-                        ),
-                      ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
         ),
-        if (showWeatherBackground)
+        if (weatherLayer != null)
           Positioned.fill(
             child: IgnorePointer(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: YsWeatherCardLayer(
-                  kind: weather!.kind,
-                  theme: theme,
-                  reduceMotion: reduceMotion,
-                ),
+                child: weatherLayer,
               ),
             ),
           ),
@@ -792,6 +887,7 @@ class _CourseCard extends StatelessWidget {
               child: Text(
                 '(${course.course.startWeek}-${course.course.endWeek}周)',
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 8,

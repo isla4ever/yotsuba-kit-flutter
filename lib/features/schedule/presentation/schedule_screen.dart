@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
-import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
 import 'package:yotsuba_schedule/features/onboarding/application/schedule_onboarding_controller.dart';
 import 'package:yotsuba_schedule/features/onboarding/presentation/spotlight_tour.dart';
@@ -20,7 +20,6 @@ import 'package:yotsuba_schedule/features/schedule/presentation/widgets/schedule
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/schedule_header.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/week_timetable.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
-import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
@@ -65,171 +64,152 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final end = start.add(const Duration(days: 6));
     final range =
         '${DateFormat('M.d').format(start)}-${DateFormat('M.d').format(end)}';
-    final sceneDate =
-        DateTime.now().isAfter(start.subtract(const Duration(days: 1))) &&
-            DateTime.now().isBefore(end.add(const Duration(days: 1)))
-        ? DateTime.now()
-        : start;
-    final dailyWeather = weather.weatherForDate(
-      ScheduleEngine.dateKey(sceneDate),
-    );
-    final sceneKind = dailyWeather != null
-        ? weatherPresentation(dailyWeather.weatherCode).kind
-        : weather.snapshot == null
-        ? WeatherKind.neutral
-        : weatherPresentation(weather.snapshot!.currentWeatherCode).kind;
-
-    return WeatherScene(
-      kind: sceneKind,
-      reduceMotion: settings.reduceMotion,
-      intensity: _editing ? 0 : 0.82,
-      child: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            Column(
-              key: _screenGuideKey,
-              children: [
-                ScheduleHeader(
-                  week: schedule.currentWeek,
-                  dateRange: range,
-                  weather: weather,
-                  reduceMotion: settings.reduceMotion,
-                  onSelectWeek: () => _showWeekPicker(schedule, controller),
-                  onWeather: _requestWeather,
-                  onManage: () => showDataManagementSheet(context),
-                  weekGuideKey: _weekGuideKey,
-                  weatherGuideKey: _weatherGuideKey,
-                  dataGuideKey: _dataGuideKey,
-                ),
-                Expanded(
-                  child: AnimatedContainer(
-                    duration: settings.reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 300),
-                    color: _editing
-                        ? context.palette.canvas.withValues(alpha: 0.96)
-                        : Colors.transparent,
-                    child: WeekTimetable(
-                      termStart: schedule.termStart,
-                      week: schedule.currentWeek,
-                      courses: schedule.courses,
-                      dayOverrides: schedule.dayOverrides,
-                      weather: weather.snapshot,
-                      visibleDays: settings.showWeekend ? 7 : 5,
-                      rowHeight: settings.scheduleRowHeight,
-                      courseTimes: settings.summerSchedule
-                          ? summerCourseTimes
-                          : standardCourseTimes,
-                      editing: _editing,
-                      reduceMotion: settings.reduceMotion,
-                      onSwipeWeek: (direction) =>
-                          controller.setWeek(schedule.currentWeek + direction),
-                      onCourseTap: (course) =>
-                          _showCourse(course, schedule.currentWeek),
-                      onDayTap: (weekday) => showDayPlannerSheet(
-                        context,
-                        date: ScheduleEngine.dateForWeekday(
-                          schedule.termStart,
-                          schedule.currentWeek,
-                          weekday,
-                        ),
+    return SafeArea(
+      bottom: false,
+      child: Stack(
+        children: [
+          Column(
+            key: _screenGuideKey,
+            children: [
+              ScheduleHeader(
+                week: schedule.currentWeek,
+                dateRange: range,
+                weather: weather,
+                reduceMotion: settings.reduceMotion,
+                onSelectWeek: () => _showWeekPicker(schedule, controller),
+                onWeather: _requestWeather,
+                onManage: () => showDataManagementSheet(context),
+                weekGuideKey: _weekGuideKey,
+                weatherGuideKey: _weatherGuideKey,
+                dataGuideKey: _dataGuideKey,
+              ),
+              Expanded(
+                child: AnimatedContainer(
+                  duration: settings.reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 300),
+                  color: _editing
+                      ? context.palette.canvas.withValues(alpha: 0.96)
+                      : Colors.transparent,
+                  child: WeekTimetable(
+                    termStart: schedule.termStart,
+                    week: schedule.currentWeek,
+                    courses: schedule.courses,
+                    dayOverrides: schedule.dayOverrides,
+                    weather: weather.snapshot,
+                    visibleDays: settings.showWeekend ? 7 : 5,
+                    rowHeight: settings.scheduleRowHeight,
+                    courseTimes: settings.summerSchedule
+                        ? summerCourseTimes
+                        : standardCourseTimes,
+                    editing: _editing,
+                    reduceMotion: settings.reduceMotion,
+                    onSwipeWeek: (direction) =>
+                        controller.setWeek(schedule.currentWeek + direction),
+                    onCourseTap: (course) =>
+                        _showCourse(course, schedule.currentWeek),
+                    onDayTap: (weekday) => showDayPlannerSheet(
+                      context,
+                      date: ScheduleEngine.dateForWeekday(
+                        schedule.termStart,
+                        schedule.currentWeek,
+                        weekday,
                       ),
-                      onEmptyCellTap: (weekday, start, end) => _addCourse(
-                        controller,
-                        schedule,
-                        weekday: weekday,
-                        section: start,
-                        endSection: end,
-                      ),
-                      dayGuideKey: _dayGuideKey,
-                      courseGuideKey: _courseGuideKey,
                     ),
+                    onEmptyCellTap: (weekday, start, end) => _addCourse(
+                      controller,
+                      schedule,
+                      weekday: weekday,
+                      section: start,
+                      endSection: end,
+                    ),
+                    dayGuideKey: _dayGuideKey,
+                    courseGuideKey: _courseGuideKey,
                   ),
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: ScheduleActionDock(
+              editing: _editing,
+              menuOpen: _toolMenuOpen,
+              onToggleMenu: () =>
+                  setState(() => _toolMenuOpen = !_toolMenuOpen),
+              onToggleEdit: () => setState(() {
+                _editing = !_editing;
+                _toolMenuOpen = false;
+              }),
+              onOpenSettings: () {
+                setState(() => _toolMenuOpen = false);
+                context.go('/settings');
+              },
+              onReplayGuide: () {
+                setState(() => _toolMenuOpen = false);
+                ref.read(scheduleOnboardingProvider.notifier).replay();
+              },
+              onAdd: () => _addCourse(controller, schedule),
+              toolsGuideKey: _toolsGuideKey,
+              addGuideKey: _addGuideKey,
+            ),
+          ),
+          if (onboarding.active)
+            SpotlightTour(
+              key: ValueKey(onboarding.requestId),
+              reduceMotion: settings.reduceMotion,
+              onFinish: () =>
+                  ref.read(scheduleOnboardingProvider.notifier).finish(),
+              steps: [
+                SpotlightStep(
+                  target: _screenGuideKey,
+                  title: '快速认识你的课表',
+                  body: '依次了解换周、课程、天气、计划和编辑。可随时关闭，之后也能从工具中重新打开。',
+                ),
+                SpotlightStep(
+                  target: _weekGuideKey,
+                  title: '切换教学周',
+                  body: '点击周数可快速跳转；左右滑动课表，则适合连续浏览前后周。',
+                ),
+                SpotlightStep(
+                  target: _courseGuideKey,
+                  title: '查看课程详情',
+                  body: '点击课程查看时间、地点和当日天气，也能继续管理作业计划与携带物品。',
+                ),
+                SpotlightStep(
+                  target: _dayGuideKey,
+                  title: '安排当天计划',
+                  body: '点击星期与日期，可记录这一天的待办，完成后直接勾选。',
+                ),
+                SpotlightStep(
+                  target: _weatherGuideKey,
+                  title: '课程天气联动',
+                  body: '授权定位后显示当前天气；预报范围内的课程详情也会给出出行提示。',
+                ),
+                SpotlightStep(
+                  target: _toolsGuideKey,
+                  title: '编辑课表',
+                  body: '在工具里切换编辑模式，即可长按空白节次并向下拖选。本引导也可在这里重新打开。',
+                ),
+                SpotlightStep(
+                  target: _addGuideKey,
+                  title: '手动新增课程',
+                  body: '点击加号新增课程，可设置星期、节次、周次、单双周和课程颜色。',
+                ),
+                SpotlightStep(
+                  target: _dataGuideKey,
+                  title: '导入、备份与日历',
+                  body: '在这里导入或备份本地 JSON，并把课程和计划导出为系统日历。',
+                ),
+                SpotlightStep(
+                  target: _screenGuideKey,
+                  title: '今日指挥台',
+                  body: '进入“今日”后，集中查看下一节课、剩余课程、未完成计划和上课准备。',
                 ),
               ],
             ),
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: ScheduleActionDock(
-                editing: _editing,
-                menuOpen: _toolMenuOpen,
-                onToggleMenu: () =>
-                    setState(() => _toolMenuOpen = !_toolMenuOpen),
-                onToggleEdit: () => setState(() {
-                  _editing = !_editing;
-                  _toolMenuOpen = false;
-                }),
-                onOpenSettings: () {
-                  setState(() => _toolMenuOpen = false);
-                  context.go('/settings');
-                },
-                onReplayGuide: () {
-                  setState(() => _toolMenuOpen = false);
-                  ref.read(scheduleOnboardingProvider.notifier).replay();
-                },
-                onAdd: () => _addCourse(controller, schedule),
-                toolsGuideKey: _toolsGuideKey,
-                addGuideKey: _addGuideKey,
-              ),
-            ),
-            if (onboarding.active)
-              SpotlightTour(
-                key: ValueKey(onboarding.requestId),
-                reduceMotion: settings.reduceMotion,
-                onFinish: () =>
-                    ref.read(scheduleOnboardingProvider.notifier).finish(),
-                steps: [
-                  SpotlightStep(
-                    target: _screenGuideKey,
-                    title: '快速认识你的课表',
-                    body: '依次了解换周、课程、天气、计划和编辑。可随时关闭，之后也能从工具中重新打开。',
-                  ),
-                  SpotlightStep(
-                    target: _weekGuideKey,
-                    title: '切换教学周',
-                    body: '点击周数可快速跳转；左右滑动课表，则适合连续浏览前后周。',
-                  ),
-                  SpotlightStep(
-                    target: _courseGuideKey,
-                    title: '查看课程详情',
-                    body: '点击课程查看时间、地点和当日天气，也能继续管理作业计划与携带物品。',
-                  ),
-                  SpotlightStep(
-                    target: _dayGuideKey,
-                    title: '安排当天计划',
-                    body: '点击星期与日期，可记录这一天的待办，完成后直接勾选。',
-                  ),
-                  SpotlightStep(
-                    target: _weatherGuideKey,
-                    title: '课程天气联动',
-                    body: '授权定位后显示当前天气；预报范围内的课程详情也会给出出行提示。',
-                  ),
-                  SpotlightStep(
-                    target: _toolsGuideKey,
-                    title: '编辑课表',
-                    body: '在工具里切换编辑模式，即可长按空白节次并向下拖选。本引导也可在这里重新打开。',
-                  ),
-                  SpotlightStep(
-                    target: _addGuideKey,
-                    title: '手动新增课程',
-                    body: '点击加号新增课程，可设置星期、节次、周次、单双周和课程颜色。',
-                  ),
-                  SpotlightStep(
-                    target: _dataGuideKey,
-                    title: '导入、备份与日历',
-                    body: '在这里导入或备份本地 JSON，并把课程和计划导出为系统日历。',
-                  ),
-                  SpotlightStep(
-                    target: _screenGuideKey,
-                    title: '今日指挥台',
-                    body: '进入“今日”后，集中查看下一节课、剩余课程、未完成计划和上课准备。',
-                  ),
-                ],
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -267,7 +247,18 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       course.weekday,
     );
     final weatherState = ref.read(weatherControllerProvider);
-    final weather = weatherState.weatherForDate(ScheduleEngine.dateKey(date));
+    final settings = ref.read(appSettingsProvider);
+    final resolvedCourseTimes = settings.summerSchedule
+        ? summerCourseTimes
+        : standardCourseTimes;
+    final startTime = course.startSection <= resolvedCourseTimes.length
+        ? resolvedCourseTimes[course.startSection - 1].start
+        : null;
+    final weather = startTime == null
+        ? weatherState.weatherForDate(ScheduleEngine.dateKey(date))
+        : weatherState.snapshot?.weatherForDateTime(
+            _courseDateTime(date, startTime),
+          );
     final action = await showCourseDetailSheet(
       context,
       course: original,
@@ -275,7 +266,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           .where((plan) => plan.courseId == original.id)
           .toList(),
       weather: weather,
-      weatherHint: _weatherHint(weatherState),
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -294,6 +284,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       case CourseDetailAction.delete:
         final confirmed = await showDialog<bool>(
           context: context,
+          animationStyle: appModalAnimationStyle,
           builder: (context) => AlertDialog(
             title: const Text('删除课程？'),
             content: Text('“${original.name}”及其课程计划将从本机移除。'),
@@ -317,17 +308,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     }
   }
 
-  String _weatherHint(WeatherState weather) {
-    return switch (weather.status) {
-      WeatherStatus.idle => '点击顶部天气按钮后查看课程当日预报',
-      WeatherStatus.loading => '正在匹配当前位置天气',
-      WeatherStatus.denied => '定位权限未开启，暂时无法匹配天气',
-      WeatherStatus.deniedForever => '请在系统或浏览器设置中允许定位',
-      WeatherStatus.serviceDisabled => '系统定位服务尚未开启',
-      WeatherStatus.unavailable => '当前设备不支持定位天气',
-      WeatherStatus.error => '天气暂时不可用，点击顶部天气按钮可重试',
-      WeatherStatus.ready => '该日期尚未进入未来预报范围',
-    };
+  DateTime _courseDateTime(DateTime date, String time) {
+    final parts = time.split(':');
+    final hour = int.tryParse(parts.first) ?? 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   Future<void> _requestWeather() async {
@@ -352,6 +337,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final selected = await showModalBottomSheet<int>(
       context: context,
       useRootNavigator: true,
+      sheetAnimationStyle: appModalAnimationStyle,
       builder: (context) {
         final palette = context.palette;
         return SafeArea(

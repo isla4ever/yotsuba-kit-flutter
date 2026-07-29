@@ -79,6 +79,32 @@ class DailyWeather {
   }
 }
 
+class HourlyWeather {
+  const HourlyWeather({
+    required this.time,
+    required this.weatherCode,
+    required this.temperature,
+  });
+
+  final DateTime time;
+  final int weatherCode;
+  final double temperature;
+
+  Map<String, Object> toJson() => {
+    'time': time.toIso8601String(),
+    'weatherCode': weatherCode,
+    'temperature': temperature,
+  };
+
+  factory HourlyWeather.fromJson(Map<String, dynamic> json) {
+    return HourlyWeather(
+      time: DateTime.parse(json['time'] as String),
+      weatherCode: json['weatherCode'] as int,
+      temperature: (json['temperature'] as num).toDouble(),
+    );
+  }
+}
+
 class WeatherSnapshot {
   const WeatherSnapshot({
     required this.latitude,
@@ -88,6 +114,7 @@ class WeatherSnapshot {
     required this.currentWeatherCode,
     required this.fetchedAt,
     required this.daily,
+    this.hourly = const [],
   });
 
   final double latitude;
@@ -97,12 +124,42 @@ class WeatherSnapshot {
   final int currentWeatherCode;
   final DateTime fetchedAt;
   final List<DailyWeather> daily;
+  final List<HourlyWeather> hourly;
 
   DailyWeather? weatherForDate(String dateKey) {
-    for (final weather in daily) {
-      if (weather.dateKey == dateKey) return weather;
+    return _weatherIndex.dailyByDate[dateKey];
+  }
+
+  DailyWeather? weatherForDateTime(DateTime target) {
+    final index = _weatherIndex;
+    final cacheKey = target.microsecondsSinceEpoch;
+    if (index.byTarget.containsKey(cacheKey)) {
+      return index.byTarget[cacheKey];
     }
-    return null;
+
+    HourlyWeather? nearest;
+    var nearestDistance = const Duration(days: 365);
+    final dateKey = _weatherDateKey(target);
+    for (final value in index.hourlyByDate[dateKey] ?? const []) {
+      final distance = value.time.difference(target).abs();
+      if (distance < nearestDistance) {
+        nearest = value;
+        nearestDistance = distance;
+      }
+    }
+    if (nearest != null) {
+      final result = DailyWeather(
+        dateKey: dateKey,
+        weatherCode: nearest.weatherCode,
+        temperatureMax: nearest.temperature,
+        temperatureMin: nearest.temperature,
+      );
+      index.byTarget[cacheKey] = result;
+      return result;
+    }
+    final result = index.dailyByDate[dateKey];
+    index.byTarget[cacheKey] = result;
+    return result;
   }
 
   Map<String, Object> toJson() => {
@@ -113,6 +170,7 @@ class WeatherSnapshot {
     'currentWeatherCode': currentWeatherCode,
     'fetchedAt': fetchedAt.toIso8601String(),
     'daily': daily.map((item) => item.toJson()).toList(),
+    'hourly': hourly.map((item) => item.toJson()).toList(),
   };
 
   factory WeatherSnapshot.fromJson(Map<String, dynamic> json) {
@@ -126,6 +184,43 @@ class WeatherSnapshot {
       daily: (json['daily'] as List<dynamic>)
           .map((item) => DailyWeather.fromJson(item as Map<String, dynamic>))
           .toList(),
+      hourly: (json['hourly'] as List<dynamic>? ?? const [])
+          .map((item) => HourlyWeather.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
+
+final Expando<_WeatherIndex> _weatherIndexCache = Expando<_WeatherIndex>(
+  'weather-index',
+);
+
+extension on WeatherSnapshot {
+  _WeatherIndex get _weatherIndex {
+    final existing = _weatherIndexCache[this];
+    if (existing != null) return existing;
+    final created = _WeatherIndex(this);
+    _weatherIndexCache[this] = created;
+    return created;
+  }
+}
+
+class _WeatherIndex {
+  _WeatherIndex(WeatherSnapshot snapshot) {
+    for (final value in snapshot.daily) {
+      dailyByDate[value.dateKey] = value;
+    }
+    for (final value in snapshot.hourly) {
+      (hourlyByDate[_weatherDateKey(value.time)] ??= []).add(value);
+    }
+  }
+
+  final Map<String, DailyWeather> dailyByDate = {};
+  final Map<String, List<HourlyWeather>> hourlyByDate = {};
+  final Map<int, DailyWeather?> byTarget = {};
+}
+
+String _weatherDateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/data/calendar/device_calendar_sync_service.dart';
 import 'package:yotsuba_schedule/data/calendar/schedule_calendar_exporter.dart';
@@ -17,6 +18,7 @@ Future<void> showDataManagementSheet(BuildContext context) {
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    sheetAnimationStyle: appModalAnimationStyle,
     builder: (context) => const _DataManagementSheet(),
   );
 }

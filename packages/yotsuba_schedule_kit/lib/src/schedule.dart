@@ -321,8 +321,12 @@ class _YsScheduleState extends State<YsSchedule> {
     final date = widget.termStart == null
         ? null
         : dateFor(widget.termStart!, widget.week, course.weekday);
-    final daily =
-        date == null ? null : _weather?.weatherForDate(formatDateKey(date));
+    final startTime = course.course.startSection <= widget.courseTimes.length
+        ? widget.courseTimes[course.course.startSection - 1].start
+        : null;
+    final daily = date == null || startTime == null
+        ? null
+        : _weather?.weatherForDateTime(_courseDateTime(date, startTime));
     showYsCourseDetail(
       context: context,
       course: course,
@@ -338,5 +342,12 @@ class _YsScheduleState extends State<YsSchedule> {
       onRemove: widget.onCourseRemove,
       onLayoutChanged: widget.onDetailLayoutChanged,
     );
+  }
+
+  DateTime _courseDateTime(DateTime date, String time) {
+    final parts = time.split(':');
+    final hour = int.tryParse(parts.first) ?? 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 }

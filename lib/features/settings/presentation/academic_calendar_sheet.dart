@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/data/calendar/china_holiday_repository.dart';
 import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
@@ -11,6 +12,7 @@ Future<void> showAcademicCalendarSheet(BuildContext context) {
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    sheetAnimationStyle: appModalAnimationStyle,
     builder: (context) => const _AcademicCalendarSheet(),
   );
 }
@@ -157,6 +159,7 @@ class _AcademicCalendarSheetState
     var weeks = schedule.totalWeeks;
     final result = await showDialog<(DateTime, int)>(
       context: context,
+      animationStyle: appModalAnimationStyle,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('学期范围'),
@@ -248,6 +251,7 @@ class _AcademicCalendarSheetState
     final name = TextEditingController(text: initial?.name ?? '校历调整');
     final result = await showDialog<AcademicDayOverride>(
       context: context,
+      animationStyle: appModalAnimationStyle,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(initial == null ? '添加日期调整' : '编辑日期调整'),

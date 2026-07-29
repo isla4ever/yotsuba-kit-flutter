@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yotsuba_schedule/core/theme/app_theme.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
+import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/week_timetable.dart';
+import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
 
 const _stableCourse = Course(
   id: 'stable',
@@ -133,5 +135,57 @@ void main() {
     expect(find.text('非本周'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('体育'), findsOneWidget);
+  });
+
+  testWidgets('inactive courses keep weather structure in a muted filter', (
+    tester,
+  ) async {
+    final weather = WeatherSnapshot(
+      latitude: 39.1,
+      longitude: 117.2,
+      timezone: 'Asia/Shanghai',
+      currentTemperature: 30,
+      currentWeatherCode: 0,
+      fetchedAt: DateTime(2026, 3, 9),
+      daily: const [
+        DailyWeather(
+          dateKey: '2026-03-12',
+          weatherCode: 0,
+          temperatureMin: 20,
+          temperatureMax: 31,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: WeekTimetable(
+            termStart: DateTime(2026, 3, 2),
+            week: 2,
+            courses: const [_weekOneCourse],
+            visibleDays: 7,
+            rowHeight: 52,
+            courseTimes: standardCourseTimes,
+            dayOverrides: const [],
+            weather: weather,
+            editing: false,
+            reduceMotion: true,
+            onCourseTap: (_) {},
+            onEmptyCellTap: (_, _, _) {},
+            onDayTap: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('非本周'), findsOneWidget);
+    expect(find.byType(WeatherCardLayer), findsOneWidget);
+    final mutedOpacity = find.ancestor(
+      of: find.byType(WeatherCardLayer),
+      matching: find.byType(Opacity),
+    );
+    expect(find.byType(ColorFiltered), findsOneWidget);
+    expect(tester.widget<Opacity>(mutedOpacity.first).opacity, 0.16);
   });
 }

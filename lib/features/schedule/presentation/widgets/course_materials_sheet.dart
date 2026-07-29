@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
@@ -12,6 +13,7 @@ Future<void> showCourseMaterialsSheet(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    sheetAnimationStyle: appModalAnimationStyle,
     builder: (context) => _CourseMaterialsSheet(course: course),
   );
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 
 Future<bool> confirmCoursePlanCompletion(
@@ -8,6 +9,7 @@ Future<bool> confirmCoursePlanCompletion(
   final confirmed = await showDialog<bool>(
     context: context,
     useRootNavigator: true,
+    animationStyle: appModalAnimationStyle,
     builder: (context) => AlertDialog(
       title: const Text('确认完成课程作业？'),
       content: Text('“${plan.title}”完成后会归入已完成记录，并保留完成时间，之后仍可在课程计划中恢复。'),

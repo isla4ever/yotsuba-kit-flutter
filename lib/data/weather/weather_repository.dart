@@ -18,6 +18,7 @@ class WeatherRepository {
       'current': 'temperature_2m,weather_code',
       'daily':
           'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+      'hourly': 'temperature_2m,weather_code',
       'forecast_days': '16',
       'timezone': 'auto',
     });
@@ -38,6 +39,11 @@ class WeatherRepository {
       final lows = daily['temperature_2m_min'] as List<dynamic>;
       final precipitation =
           daily['precipitation_probability_max'] as List<dynamic>?;
+      final hourly = json['hourly'] as Map<String, dynamic>?;
+      final hourlyTimes = hourly?['time'] as List<dynamic>? ?? const [];
+      final hourlyCodes = hourly?['weather_code'] as List<dynamic>? ?? const [];
+      final hourlyTemperatures =
+          hourly?['temperature_2m'] as List<dynamic>? ?? const [];
       return WeatherSnapshot(
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
@@ -53,6 +59,17 @@ class WeatherRepository {
             temperatureMax: (highs[index] as num?)?.toDouble() ?? 0,
             temperatureMin: (lows[index] as num?)?.toDouble() ?? 0,
             precipitationProbability: (precipitation?[index] as num?)?.toInt(),
+          );
+        }),
+        hourly: List.generate(hourlyTimes.length, (index) {
+          return HourlyWeather(
+            time: DateTime.parse(hourlyTimes[index] as String),
+            weatherCode: index < hourlyCodes.length
+                ? (hourlyCodes[index] as num?)?.toInt() ?? 0
+                : 0,
+            temperature: index < hourlyTemperatures.length
+                ? (hourlyTemperatures[index] as num?)?.toDouble() ?? 0
+                : 0,
           );
         }),
       );

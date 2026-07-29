@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
 import 'package:yotsuba_schedule/domain/models/day_task.dart';
@@ -17,6 +18,7 @@ Future<void> showDayPlannerSheet(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    sheetAnimationStyle: appModalAnimationStyle,
     builder: (context) => _DayPlannerSheet(date: date),
   );
 }
@@ -155,6 +157,7 @@ class _DayPlannerSheetState extends ConsumerState<_DayPlannerSheet> {
     final controller = TextEditingController(text: task.title);
     final value = await showDialog<String>(
       context: context,
+      animationStyle: appModalAnimationStyle,
       builder: (context) => AlertDialog(
         title: const Text('编辑当天计划'),
         content: TextField(

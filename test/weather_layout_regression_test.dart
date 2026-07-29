@@ -81,7 +81,11 @@ void main() {
   });
 
   test('weather response tolerates nullable forecast values', () async {
-    final client = MockClient((_) async {
+    final client = MockClient((request) async {
+      expect(
+        request.url.queryParameters['hourly'],
+        'temperature_2m,weather_code',
+      );
       return http.Response(
         jsonEncode({
           'latitude': 34.6,
@@ -95,6 +99,11 @@ void main() {
             'temperature_2m_min': [22.0, 23.0],
             'precipitation_probability_max': [77, null],
           },
+          'hourly': {
+            'time': ['2026-07-26T08:00', '2026-07-26T15:00'],
+            'weather_code': [0, 71],
+            'temperature_2m': [24.0, 2.0],
+          },
         }),
         200,
       );
@@ -107,6 +116,11 @@ void main() {
     expect(snapshot.daily.first.precipitationProbability, 77);
     expect(snapshot.daily.last.weatherCode, 0);
     expect(snapshot.daily.last.temperatureMax, 0);
+    expect(snapshot.hourly.map((item) => item.weatherCode), [0, 71]);
+    expect(
+      snapshot.weatherForDateTime(DateTime(2026, 7, 26, 14, 30))?.weatherCode,
+      71,
+    );
   });
 
   testWidgets('dashboard widgets fit every supported tile size at 320px', (

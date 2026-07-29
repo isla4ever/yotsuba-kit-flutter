@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
@@ -12,18 +13,14 @@ Future<CourseDetailAction?> showCourseDetailSheet(
   required Course course,
   required List<CoursePlan> plans,
   DailyWeather? weather,
-  String weatherHint = '',
 }) {
   return showModalBottomSheet<CourseDetailAction>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
-    builder: (context) => _CourseDetailSheet(
-      course: course,
-      plans: plans,
-      weather: weather,
-      weatherHint: weatherHint,
-    ),
+    sheetAnimationStyle: appModalAnimationStyle,
+    builder: (context) =>
+        _CourseDetailSheet(course: course, plans: plans, weather: weather),
   );
 }
 
@@ -32,13 +29,11 @@ class _CourseDetailSheet extends StatelessWidget {
     required this.course,
     required this.plans,
     required this.weather,
-    required this.weatherHint,
   });
 
   final Course course;
   final List<CoursePlan> plans;
   final DailyWeather? weather;
-  final String weatherHint;
 
   @override
   Widget build(BuildContext context) {
@@ -162,8 +157,6 @@ class _CourseDetailSheet extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    _WeatherHint(weather: weather, hint: weatherHint),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -211,6 +204,11 @@ class _CourseHero extends StatelessWidget {
     final presentation = weather == null
         ? null
         : weatherPresentation(weather!.weatherCode);
+    final temperatureText = weather == null
+        ? null
+        : weather!.temperatureMin == weather!.temperatureMax
+        ? '${weather!.temperatureMax.round()}°'
+        : '${weather!.temperatureMin.round()}~${weather!.temperatureMax.round()}°';
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 88),
@@ -262,22 +260,37 @@ class _CourseHero extends StatelessWidget {
             ),
           ),
           if (weather != null && presentation != null)
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                WeatherGlyph(kind: presentation.kind, size: 28),
-                Text(
-                  '${weather!.temperatureMax.round()}°',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+            Semantics(
+              label: '${presentation.label}，$temperatureText',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  WeatherGlyph(
+                    kind: presentation.kind,
+                    size: 31,
+                    animate: !MediaQuery.disableAnimationsOf(context),
                   ),
-                ),
-                Text(
-                  presentation.label,
-                  style: TextStyle(fontSize: 9, color: palette.textFaint),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        temperatureText!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        presentation.label,
+                        style: TextStyle(fontSize: 9, color: palette.textFaint),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
         ],
       ),
@@ -409,49 +422,6 @@ class _ActionRow extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, color: palette.textFaint),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _WeatherHint extends StatelessWidget {
-  const _WeatherHint({required this.weather, required this.hint});
-
-  final DailyWeather? weather;
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final presentation = weather == null
-        ? null
-        : weatherPresentation(weather!.weatherCode);
-    final rain = weather?.precipitationProbability;
-    final message = weather == null
-        ? (hint.isEmpty ? '该日期天气暂不可用' : hint)
-        : '${presentation!.label}，${weather!.temperatureMin.round()}°-${weather!.temperatureMax.round()}°${rain != null && rain >= 40 ? '，降水概率 $rain%，记得带伞' : '，出发前留意体感变化'}';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.surfaceRaised,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          if (presentation != null)
-            WeatherGlyph(kind: presentation.kind, size: 19)
-          else
-            Icon(Icons.cloud_off_outlined, size: 18, color: palette.textFaint),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 11, color: palette.textSoft),
-            ),
-          ),
-        ],
       ),
     );
   }

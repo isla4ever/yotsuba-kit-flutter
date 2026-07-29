@@ -9,7 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  yotsuba_schedule_kit: ^0.6.0
+  yotsuba_schedule_kit:
+    path: ..
 
 dev_dependencies:
   flutter_test:

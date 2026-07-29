@@ -5,6 +5,9 @@
 - Reworked course weather into localized micro-motion: sun halo, drifting cloud edge, glass rain traces, storm refraction, frost points, and feathered fog.
 - Preserved the original course color as the card foundation and made course-card weather glyphs opt-in with `weatherCardGlyph`.
 - Replaced full-screen precipitation and lightning flashes with slow blurred weather ambience and smoother state transitions.
+- Added hourly weather points and nearest-course-time matching so courses on the same day can use different weather and temperatures.
+- Kept inactive courses desaturated, restored weekend weather layers, and constrained compact cards and long course text without changing timetable presentation.
+- Added distinct `1x1`, `1x2`, `2x1`, and `2x2` Today weather layouts, including hourly summaries and a large temperature trend.
 
 ## 0.6.0
 

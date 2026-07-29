@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
+import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/announcements/application/local_announcement_controller.dart';
 import 'package:yotsuba_schedule/features/announcements/presentation/local_announcement_dialog.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
+import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({required this.navigationShell, super.key});
@@ -70,35 +72,49 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = ref.watch(appSettingsProvider).reduceMotion;
+    final settings = ref.watch(appSettingsProvider);
+    final weather = ref.watch(weatherControllerProvider);
+    final reduceMotion = settings.reduceMotion;
+    final sceneKind = weather.snapshot == null
+        ? WeatherKind.neutral
+        : weatherPresentation(weather.snapshot!.currentWeatherCode).kind;
     final animation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutQuart,
     );
-    return Scaffold(
-      body: reduceMotion
-          ? widget.navigationShell
-          : FadeTransition(
-              opacity: Tween<double>(begin: 0.9, end: 1).animate(animation),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: Offset(0.007 * _direction, 0.003),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.999, end: 1).animate(animation),
-                  child: widget.navigationShell,
+    return WeatherScene(
+      kind: sceneKind,
+      reduceMotion: reduceMotion,
+      intensity: 0.82,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: reduceMotion
+            ? widget.navigationShell
+            : FadeTransition(
+                opacity: Tween<double>(begin: 0.9, end: 1).animate(animation),
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(0.007 * _direction, 0.003),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: ScaleTransition(
+                    scale: Tween<double>(
+                      begin: 0.999,
+                      end: 1,
+                    ).animate(animation),
+                    child: widget.navigationShell,
+                  ),
                 ),
               ),
-            ),
-      bottomNavigationBar: _AppTabBar(
-        selectedIndex: widget.navigationShell.currentIndex,
-        onSelected: (index) {
-          widget.navigationShell.goBranch(
-            index,
-            initialLocation: index == widget.navigationShell.currentIndex,
-          );
-        },
+        bottomNavigationBar: _AppTabBar(
+          selectedIndex: widget.navigationShell.currentIndex,
+          onSelected: (index) {
+            widget.navigationShell.goBranch(
+              index,
+              initialLocation: index == widget.navigationShell.currentIndex,
+            );
+          },
+        ),
       ),
     );
   }
@@ -122,7 +138,7 @@ class _AppTabBar extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: palette.surface.withValues(alpha: 0.97),
+        color: palette.surface.withValues(alpha: 0.84),
         border: Border(top: BorderSide(color: palette.border)),
       ),
       child: SizedBox(

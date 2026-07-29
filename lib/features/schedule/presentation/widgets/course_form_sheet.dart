@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 
@@ -16,6 +17,7 @@ Future<Course?> showCourseFormSheet(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    sheetAnimationStyle: appModalAnimationStyle,
     builder: (context) => _CourseForm(
       currentWeek: currentWeek,
       totalWeeks: totalWeeks,

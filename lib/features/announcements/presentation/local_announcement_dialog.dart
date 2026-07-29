@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/local_announcement.dart';
 
@@ -10,6 +11,7 @@ Future<bool> showLocalAnnouncementDialog(
   var mute = false;
   final result = await showDialog<bool>(
     context: context,
+    animationStyle: appModalAnimationStyle,
     builder: (context) => StatefulBuilder(
       builder: (context, setDialogState) {
         final palette = context.palette;

@@ -124,13 +124,13 @@ class _WeatherGlyphPainter extends CustomPainter {
     );
     switch (kind) {
       case WeatherKind.drizzle:
-        _rain(canvas, size, unit, count: 2, speed: 1.4, opacity: 0.58);
+        _rain(canvas, size, unit, count: 2, cycles: 1, opacity: 0.58);
       case WeatherKind.rain:
-        _rain(canvas, size, unit, count: 3, speed: 2.4, opacity: 0.76);
+        _rain(canvas, size, unit, count: 3, cycles: 3, opacity: 0.76);
       case WeatherKind.heavyRain:
-        _rain(canvas, size, unit, count: 5, speed: 4.2, opacity: 0.96);
+        _rain(canvas, size, unit, count: 5, cycles: 5, opacity: 0.96);
       case WeatherKind.storm:
-        _rain(canvas, size, unit, count: 4, speed: 3.4, opacity: 0.82);
+        _rain(canvas, size, unit, count: 4, cycles: 4, opacity: 0.82);
         _lightning(canvas, size);
       case WeatherKind.snow:
         _snow(canvas, size, unit);
@@ -212,17 +212,22 @@ class _WeatherGlyphPainter extends CustomPainter {
     Size size,
     double unit, {
     required int count,
-    required double speed,
+    required int cycles,
     required double opacity,
   }) {
     final paint = Paint()
-      ..color = color.withValues(alpha: opacity)
       ..strokeWidth = math.max(1, unit * 0.055)
       ..strokeCap = StrokeCap.round;
-    final travel = (progress * speed) % 1;
     for (var index = 0; index < count; index++) {
+      final phase = (progress * cycles + index / count) % 1;
+      final edgeOpacity = phase < 0.18
+          ? phase / 0.18
+          : phase > 0.82
+          ? (1 - phase) / 0.18
+          : 1.0;
+      paint.color = color.withValues(alpha: opacity * edgeOpacity);
       final x = size.width * (0.22 + index * (0.58 / math.max(1, count - 1)));
-      final y = size.height * (0.68 + ((travel + index * 0.27) % 1) * 0.18);
+      final y = size.height * (0.64 + phase * 0.26);
       canvas.drawLine(
         Offset(x + unit * 0.035, y - unit * 0.07),
         Offset(x - unit * 0.035, y + unit * 0.07),
@@ -232,14 +237,61 @@ class _WeatherGlyphPainter extends CustomPainter {
   }
 
   void _snow(Canvas canvas, Size size, double unit) {
-    final paint = Paint()..color = color.withValues(alpha: 0.9);
-    for (var index = 0; index < 4; index++) {
-      final x =
-          size.width * (0.22 + index * 0.18) +
-          math.sin(progress * math.pi * 2 + index) * unit * 0.035;
-      final y = size.height * (0.7 + ((progress + index * 0.23) % 1) * 0.16);
-      canvas.drawCircle(Offset(x, y), unit * 0.035, paint);
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.94)
+      ..strokeWidth = math.max(1, unit * 0.045)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final float = math.sin(progress * math.pi * 2) * unit * 0.025;
+    _drawSnowflake(
+      canvas,
+      Offset(size.width * 0.6, size.height * 0.79 + float),
+      unit * 0.13,
+      paint,
+      progress * math.pi / 3,
+    );
+    _drawSnowflake(
+      canvas,
+      Offset(size.width * 0.3, size.height * 0.75 - float),
+      unit * 0.075,
+      paint..color = color.withValues(alpha: 0.7),
+      -progress * math.pi / 4,
+    );
+  }
+
+  void _drawSnowflake(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Paint paint,
+    double rotation,
+  ) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+    for (var axis = 0; axis < 3; axis++) {
+      final angle = axis * math.pi / 3;
+      final direction = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(direction * -radius, direction * radius, paint);
+      for (final sign in [-1.0, 1.0]) {
+        final tip = direction * radius * sign;
+        final backAngle = angle + (sign > 0 ? math.pi : 0);
+        for (final branch in [-0.55, 0.55]) {
+          canvas.drawLine(
+            tip,
+            tip +
+                Offset(
+                      math.cos(backAngle + branch),
+                      math.sin(backAngle + branch),
+                    ) *
+                    radius *
+                    0.34,
+            paint,
+          );
+        }
+      }
     }
+    canvas.restore();
   }
 
   void _fog(Canvas canvas, double unit) {

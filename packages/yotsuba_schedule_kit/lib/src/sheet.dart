@@ -34,7 +34,7 @@ Future<T?> showYsAdaptiveSheet<T>({
     barrierLabel: barrierLabel,
     barrierColor: Colors.black.withValues(alpha: 0.28),
     transitionDuration:
-        reduceMotion ? Duration.zero : const Duration(milliseconds: 220),
+        reduceMotion ? Duration.zero : const Duration(milliseconds: 280),
     pageBuilder: (context, animation, secondaryAnimation) => _YsSheetPage(
       title: title,
       icon: icon,
@@ -48,13 +48,13 @@ Future<T?> showYsAdaptiveSheet<T>({
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curved = CurvedAnimation(
         parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
+        curve: const Cubic(0.16, 1, 0.3, 1),
+        reverseCurve: const Cubic(0.4, 0, 0.2, 1),
       );
       return FadeTransition(
         opacity: curved,
         child: ScaleTransition(
-          scale: Tween<double>(begin: 0.985, end: 1).animate(curved),
+          scale: Tween<double>(begin: 0.992, end: 1).animate(curved),
           child: child,
         ),
       );

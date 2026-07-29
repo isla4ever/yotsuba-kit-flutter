@@ -314,8 +314,25 @@ class _YsTodayState extends State<YsToday> {
                 IconButton(
                   tooltip: _editing ? '完成布局调整' : '调整今日布局',
                   onPressed: () => _setEditing(!_editing),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size.square(40),
+                    minimumSize: const Size.square(40),
+                    maximumSize: const Size.square(40),
+                    padding: EdgeInsets.zero,
+                    side: BorderSide(
+                      color:
+                          _editing ? widget.theme.accent : widget.theme.border,
+                    ),
+                    backgroundColor: _editing
+                        ? widget.theme.accent.withValues(alpha: 0.1)
+                        : widget.theme.surface1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                   icon: Icon(
-                    _editing ? Icons.check : Icons.dashboard_customize_outlined,
+                    _editing ? Icons.check : Icons.edit_outlined,
+                    size: 20,
                     color: _editing ? widget.theme.accent : widget.theme.text2,
                   ),
                 ),
@@ -482,19 +499,135 @@ class _YsTodayState extends State<YsToday> {
     };
   }
 
+  bool _isCompact(YsTodayBuildContext data) =>
+      data.size.columns == 1 && data.size.rows == 1;
+
+  bool _isTall(YsTodayBuildContext data) =>
+      data.size.columns == 1 && data.size.rows == 2;
+
+  bool _isWide(YsTodayBuildContext data) =>
+      data.size.columns == 2 && data.size.rows == 1;
+
+  int _itemLimit(YsTodayBuildContext data) {
+    if (_isCompact(data)) return 1;
+    if (_isWide(data)) return 2;
+    if (_isTall(data)) return 4;
+    return 6;
+  }
+
   Widget _nextCourse(YsTodayBuildContext data) {
     final next = _findNextCourse(data);
+    if (_isCompact(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-next-compact'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _eyebrow(Icons.play_circle_outline, '下一节'),
+            const Spacer(),
+            Text(
+              next?.course.name ?? _emptyFor('next-course', '今日已结束'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: widget.theme.text1,
+              ),
+            ),
+            if (next != null)
+              Text(
+                '${next.course.startSection}-${next.course.endSection} 节',
+                style: TextStyle(fontSize: 10, color: widget.theme.text3),
+              ),
+          ],
+        ),
+      );
+    }
+    if (_isWide(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-next-wide'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _eyebrow(Icons.play_circle_outline, '下一节'),
+            const Spacer(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        next?.course.name ??
+                            _emptyFor('next-course', '今天课程已结束'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 20,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                          color: widget.theme.text1,
+                        ),
+                      ),
+                      if (next != null)
+                        Text(
+                          '${next.course.startSection}-${next.course.endSection} 节'
+                          '${next.course.location == null ? '' : ' · ${next.course.location}'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: widget.theme.text3,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (next != null)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: widget.theme.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: Text(
+                        '${next.course.startSection} 节开始',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: widget.theme.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    final preview = data.todayCourses.take(_isTall(data) ? 3 : 4).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _eyebrow(Icons.play_circle_outline, '下一节'),
-        const Spacer(),
+        _eyebrow(
+          Icons.play_circle_outline,
+          _isTall(data) ? '后续课程' : '今日接下来',
+        ),
+        const SizedBox(height: 12),
         Text(
           next?.course.name ?? _emptyFor('next-course', '今天课程已结束'),
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: data.size == YsTodayWidgetSize.compact ? 15 : 20,
+            fontSize: 21,
             height: 1.12,
             fontWeight: FontWeight.w800,
             color: widget.theme.text1,
@@ -510,12 +643,85 @@ class _YsTodayState extends State<YsToday> {
             style: TextStyle(fontSize: 10, color: widget.theme.text3),
           ),
         ],
+        const SizedBox(height: 8),
+        Divider(height: 1, color: widget.theme.border),
+        const SizedBox(height: 4),
+        for (final course in preview)
+          Expanded(
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 32,
+                  child: Text(
+                    '${course.course.startSection}节',
+                    style: TextStyle(fontSize: 9, color: widget.theme.text3),
+                  ),
+                ),
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: widget.theme.accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    course.course.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: widget.theme.text1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 
   Widget _timeline(YsTodayBuildContext data) {
-    final limit = data.size.rows > 1 ? 6 : 3;
+    if (_isCompact(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-timeline-compact'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _eyebrow(Icons.view_timeline_outlined, '今日课程'),
+            const Spacer(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${data.todayCourses.length}',
+                  style: TextStyle(
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                    color: widget.theme.text1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 1),
+                  child: Text(
+                    '节课程',
+                    style: TextStyle(fontSize: 10, color: widget.theme.text3),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+          ],
+        ),
+      );
+    }
+    final limit = _itemLimit(data);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -523,6 +729,61 @@ class _YsTodayState extends State<YsToday> {
         const SizedBox(height: 9),
         if (data.todayCourses.isEmpty)
           _emptyText(_emptyFor('today-timeline', '今天没有课程'))
+        else if (_isWide(data))
+          Expanded(
+            child: Row(
+              children: [
+                for (var index = 0;
+                    index < math.min(limit, data.todayCourses.length);
+                    index++) ...[
+                  if (index > 0) const SizedBox(width: 12),
+                  Expanded(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: widget.theme.surface2,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: widget.theme.accent,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                data.todayCourses[index].course.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: widget.theme.text1,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${data.todayCourses[index].course.startSection}节',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: widget.theme.text3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          )
         else
           for (final course in data.todayCourses.take(limit))
             Expanded(
@@ -569,6 +830,33 @@ class _YsTodayState extends State<YsToday> {
         })
         .values
         .toList();
+    if (_isCompact(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-readiness-compact'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _eyebrow(Icons.backpack_outlined, '上课准备'),
+            const Spacer(),
+            Text(
+              '${materials.length}',
+              style: TextStyle(
+                fontSize: 24,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                color: widget.theme.text1,
+              ),
+            ),
+            Text(
+              materials.isEmpty ? '无需额外物品' : materials.first.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: widget.theme.text3),
+            ),
+          ],
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -578,34 +866,99 @@ class _YsTodayState extends State<YsToday> {
           _emptyText(_emptyFor('readiness', '今天没有额外物品'))
         else
           Expanded(
-            child: Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                for (final material in materials)
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    avatar: Icon(
-                      material.kind == YsCourseMaterialKind.book
-                          ? Icons.menu_book_outlined
-                          : Icons.check_circle_outline,
-                      size: 15,
-                    ),
-                    label: Text(
-                      material.quantity > 1
-                          ? '${material.name} x${material.quantity}'
-                          : material.name,
-                    ),
+            child: _isTall(data)
+                ? Column(
+                    children: [
+                      for (final material in materials.take(_itemLimit(data)))
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                material.kind == YsCourseMaterialKind.book
+                                    ? Icons.menu_book_outlined
+                                    : Icons.check_circle_outline,
+                                size: 16,
+                                color: widget.theme.accent,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  material.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: widget.theme.text1,
+                                  ),
+                                ),
+                              ),
+                              if (material.quantity > 1)
+                                Text(
+                                  'x${material.quantity}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: widget.theme.text3,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  )
+                : Wrap(
+                    spacing: 7,
+                    runSpacing: _isWide(data) ? 5 : 9,
+                    children: [
+                      for (final material in materials.take(_itemLimit(data)))
+                        Chip(
+                          visualDensity: VisualDensity.compact,
+                          avatar: Icon(
+                            material.kind == YsCourseMaterialKind.book
+                                ? Icons.menu_book_outlined
+                                : Icons.check_circle_outline,
+                            size: 15,
+                          ),
+                          label: Text(
+                            material.quantity > 1
+                                ? '${material.name} x${material.quantity}'
+                                : material.name,
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
           ),
       ],
     );
   }
 
   Widget _plans(YsTodayBuildContext data) {
-    final limit = data.size.rows > 1 ? 6 : 3;
+    final limit = _itemLimit(data);
+    final completed = data.plans.where((plan) => plan.done).length;
+    if (_isCompact(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-plans-compact'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _eyebrow(Icons.task_alt_outlined, '今日计划'),
+            const Spacer(),
+            Text(
+              '$completed/${data.plans.length}',
+              style: TextStyle(
+                fontSize: 22,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                color: widget.theme.text1,
+              ),
+            ),
+            Text(
+              '已完成',
+              style: TextStyle(fontSize: 10, color: widget.theme.text3),
+            ),
+          ],
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -650,7 +1003,35 @@ class _YsTodayState extends State<YsToday> {
       for (final course in data.todayCourses)
         for (final task in course.course.tasks) (course: course, task: task),
     ];
-    final limit = data.size.rows > 1 ? 6 : 3;
+    final limit = _itemLimit(data);
+    if (_isCompact(data)) {
+      final pending = tasks.where((item) => !item.task.done).toList();
+      return KeyedSubtree(
+        key: const ValueKey('today-course-tasks-compact'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _eyebrow(Icons.task_alt_outlined, '课程任务'),
+            const Spacer(),
+            Text(
+              '${pending.length}',
+              style: TextStyle(
+                fontSize: 24,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                color: widget.theme.text1,
+              ),
+            ),
+            Text(
+              pending.isEmpty ? '全部完成' : pending.first.task.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: widget.theme.text3),
+            ),
+          ],
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -876,41 +1257,344 @@ class _YsTodayState extends State<YsToday> {
         ],
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _eyebrow(Icons.location_on_outlined, '今日天气'),
-        const Spacer(),
-        Row(
+    final hours = _todayWeatherHours(data);
+    final label = current?.label ?? daily?.label ?? ysWeatherLabel(kind);
+    final range = daily?.highC == null
+        ? null
+        : '${daily?.lowC?.round() ?? '--'}~${daily!.highC!.round()}°';
+
+    if (_isCompact(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-weather-compact'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            YsWeatherGlyph(kind: kind, size: 31, color: widget.theme.accent),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            Row(
+              children: [
+                Expanded(child: _eyebrow(Icons.location_on_outlined, '今日天气')),
+                if (range != null)
                   Text(
-                    temperature == null ? '--°' : '${temperature.round()}°',
-                    style: TextStyle(
-                      fontSize: 24,
-                      height: 1,
-                      fontWeight: FontWeight.w800,
-                      color: widget.theme.text1,
-                    ),
+                    range,
+                    style: TextStyle(fontSize: 9, color: widget.theme.text3),
                   ),
-                  const SizedBox(height: 4),
+              ],
+            ),
+            const Spacer(),
+            _weatherCurrent(kind, temperature, label),
+            const Spacer(),
+          ],
+        ),
+      );
+    }
+
+    if (_isWide(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-weather-wide'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: _eyebrow(Icons.location_on_outlined, '今日天气')),
+                if (range != null)
                   Text(
-                    current?.label ?? daily?.label ?? ysWeatherLabel(kind),
-                    style: TextStyle(fontSize: 11, color: widget.theme.text3),
+                    range,
+                    style: TextStyle(fontSize: 9, color: widget.theme.text3),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Expanded(
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 128,
+                    child: _weatherCurrent(kind, temperature, label),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: hours.isEmpty
+                        ? _emptyText('暂无逐时预报')
+                        : _weatherBars(hours.take(4).toList()),
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ],
+      );
+    }
+
+    if (_isTall(data)) {
+      return KeyedSubtree(
+        key: const ValueKey('today-weather-tall'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: _eyebrow(Icons.location_on_outlined, '今日天气')),
+                if (range != null)
+                  Text(
+                    range,
+                    style: TextStyle(fontSize: 9, color: widget.theme.text3),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _weatherCurrent(kind, temperature, label, glyphSize: 36),
+            const SizedBox(height: 10),
+            Divider(height: 1, color: widget.theme.border),
+            const SizedBox(height: 4),
+            if (hours.isEmpty)
+              Expanded(child: Center(child: _emptyText('暂无逐时预报')))
+            else
+              for (final hour in hours.take(4))
+                Expanded(child: _weatherHourRow(hour)),
+          ],
+        ),
+      );
+    }
+
+    return KeyedSubtree(
+      key: const ValueKey('today-weather-large'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _eyebrow(Icons.location_on_outlined, '今日天气')),
+              if (range != null)
+                Text(
+                  range,
+                  style: TextStyle(fontSize: 10, color: widget.theme.text3),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: 132,
+                  child: _weatherCurrent(
+                    kind,
+                    temperature,
+                    label,
+                    glyphSize: 48,
+                    temperatureSize: 34,
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '逐时变化',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: widget.theme.text2,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${math.min(hours.length, 6)} 个时段',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: widget.theme.text3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Expanded(
+                        child: hours.isEmpty
+                            ? _emptyText('暂无逐时预报')
+                            : _weatherBars(hours.take(6).toList(),
+                                showGlyph: true),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  List<YsHourlyWeather> _todayWeatherHours(YsTodayBuildContext data) {
+    final values = data.weather?.hourly
+            .where((value) =>
+                value.time.year == data.now.year &&
+                value.time.month == data.now.month &&
+                value.time.day == data.now.day)
+            .toList() ??
+        <YsHourlyWeather>[];
+    values.sort((first, second) => first.time.compareTo(second.time));
+    return values;
+  }
+
+  Widget _weatherCurrent(
+    YsWeatherKind kind,
+    double? temperature,
+    String label, {
+    double glyphSize = 31,
+    double temperatureSize = 24,
+  }) =>
+      Row(
+        children: [
+          YsWeatherGlyph(
+            kind: kind,
+            size: glyphSize,
+            color: widget.theme.accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  temperature == null ? '--°' : '${temperature.round()}°',
+                  style: TextStyle(
+                    fontSize: temperatureSize,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                    color: widget.theme.text1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10, color: widget.theme.text3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+
+  Widget _weatherHourRow(YsHourlyWeather hour) => Row(
+        children: [
+          SizedBox(
+            width: 38,
+            child: Text(
+              _hourLabel(hour.time),
+              style: TextStyle(fontSize: 9, color: widget.theme.text3),
+            ),
+          ),
+          YsWeatherGlyph(
+            kind: hour.kind,
+            size: 18,
+            color: widget.theme.accent,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              hour.label ?? ysWeatherLabel(hour.kind),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: widget.theme.text2),
+            ),
+          ),
+          Text(
+            hour.temperatureC == null ? '--' : '${hour.temperatureC!.round()}°',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: widget.theme.text1,
+            ),
+          ),
+        ],
+      );
+
+  Widget _weatherBars(
+    List<YsHourlyWeather> hours, {
+    bool showGlyph = false,
+  }) {
+    final temperatures =
+        hours.map((hour) => hour.temperatureC).whereType<double>().toList();
+    final low = temperatures.isEmpty ? 0.0 : temperatures.reduce(math.min);
+    final high = temperatures.isEmpty ? 0.0 : temperatures.reduce(math.max);
+    return Semantics(
+      key: const ValueKey('today-weather-hourly-chart'),
+      label: '今日逐时天气与温度',
+      image: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var index = 0; index < hours.length; index++) ...[
+            if (index > 0) const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    _hourLabel(hours[index].time),
+                    style: TextStyle(fontSize: 8, color: widget.theme.text3),
+                  ),
+                  const SizedBox(height: 2),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: FractionallySizedBox(
+                        heightFactor: _temperatureFactor(
+                          hours[index].temperatureC,
+                          low,
+                          high,
+                        ),
+                        widthFactor: 1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: widget.theme.accent.withValues(alpha: 0.68),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (showGlyph) ...[
+                    const SizedBox(height: 3),
+                    YsWeatherGlyph(
+                      kind: hours[index].kind,
+                      size: 15,
+                      color: widget.theme.accent,
+                    ),
+                  ],
+                  const SizedBox(height: 2),
+                  Text(
+                    hours[index].temperatureC == null
+                        ? '--'
+                        : '${hours[index].temperatureC!.round()}°',
+                    style: TextStyle(fontSize: 8, color: widget.theme.text2),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  double _temperatureFactor(double? value, double low, double high) {
+    if (value == null) return 0.32;
+    if (high == low) return 0.58;
+    return 0.28 + (value - low) / (high - low) * 0.52;
+  }
+
+  String _hourLabel(DateTime time) =>
+      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 
   Widget _emptyCustom(String id) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,

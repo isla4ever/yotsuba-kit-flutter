@@ -92,7 +92,7 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
     ),
     YsTodayWidgetConfig(
       id: YsTodayWidgetIds.weather,
-      size: YsTodayWidgetSize.compact,
+      size: YsTodayWidgetSize.twoByTwo,
     ),
     YsTodayWidgetConfig(id: YsTodayWidgetIds.timeline),
     YsTodayWidgetConfig(
@@ -219,7 +219,11 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
       termStart: _termStart,
       onWeekChanged: (value) => setState(() => _week = value),
       visibleDays: _visibleDays,
-      rowHeight: _density == YsScheduleDensity.minimal ? 50 : 58,
+      rowHeight: switch (_density) {
+        YsScheduleDensity.minimal => 50,
+        YsScheduleDensity.normal => 58,
+        YsScheduleDensity.rich => 66,
+      },
       theme: _kitTheme,
       headerStyle: _headerStyle,
       headerTitle: 'Yotsuba 课程表',
@@ -334,6 +338,7 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           label: current.label,
         ),
         daily: _weather.daily,
+        hourly: _weather.hourly,
         updatedAt: DateTime.now(),
       );
     });
@@ -440,6 +445,39 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           note: '本周进行街区公共空间方案汇报。',
         ),
         YsCourse(
+          id: 'calculus',
+          name: '高等数学',
+          teacher: '陈老师',
+          location: '教学楼 201',
+          weekday: 1,
+          startSection: 5,
+          endSection: 6,
+          startWeek: 1,
+          endWeek: 20,
+        ),
+        YsCourse(
+          id: 'seminar',
+          name: '城市观察研讨',
+          teacher: '项目导师',
+          location: '学院楼 308',
+          weekday: 1,
+          startSection: 9,
+          endSection: 10,
+          startWeek: 1,
+          endWeek: 12,
+        ),
+        YsCourse(
+          id: 'database',
+          name: '数据库系统',
+          teacher: '郑老师',
+          location: '机房 C',
+          weekday: 2,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 18,
+        ),
+        YsCourse(
           id: 'statistics',
           name: '城市数据分析',
           teacher: '周老师',
@@ -458,6 +496,17 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           ],
         ),
         YsCourse(
+          id: 'coding',
+          name: '程序设计实践',
+          teacher: '吴老师',
+          location: '机房 A',
+          weekday: 2,
+          startSection: 7,
+          endSection: 8,
+          startWeek: 1,
+          endWeek: 20,
+        ),
+        YsCourse(
           id: 'theory',
           name: '规划理论前沿',
           teacher: '陈老师',
@@ -469,6 +518,50 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           endWeek: 16,
           parity: YsWeekParity.odd,
           note: '课前阅读指定论文。',
+        ),
+        YsCourse(
+          id: 'interaction',
+          name: '人机交互',
+          teacher: '宋老师',
+          location: '创新楼 B12',
+          weekday: 3,
+          startSection: 3,
+          endSection: 4,
+          startWeek: 1,
+          endWeek: 16,
+        ),
+        YsCourse(
+          id: 'ecology',
+          name: '城市生态学',
+          teacher: '韩老师',
+          location: '学院楼 205',
+          weekday: 3,
+          startSection: 5,
+          endSection: 6,
+          startWeek: 1,
+          endWeek: 16,
+        ),
+        YsCourse(
+          id: 'security',
+          name: '信息安全',
+          teacher: '邵老师',
+          location: '教学楼 108',
+          weekday: 3,
+          startSection: 9,
+          endSection: 10,
+          startWeek: 1,
+          endWeek: 18,
+        ),
+        YsCourse(
+          id: 'economics',
+          name: '经济学原理',
+          teacher: '邓老师',
+          location: '教学楼 109',
+          weekday: 4,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 16,
         ),
         YsCourse(
           id: 'gis',
@@ -483,6 +576,28 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           materials: ['电脑', '校园卡'],
         ),
         YsCourse(
+          id: 'prototype',
+          name: '产品原型实践',
+          teacher: '唐老师',
+          location: '创新工坊',
+          weekday: 4,
+          startSection: 9,
+          endSection: 10,
+          startWeek: 1,
+          endWeek: 16,
+        ),
+        YsCourse(
+          id: 'compiler',
+          name: '编译原理',
+          teacher: '任老师',
+          location: '教学楼 401',
+          weekday: 5,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 18,
+        ),
+        YsCourse(
           id: 'english',
           name: '学术英语',
           teacher: 'Miller',
@@ -492,6 +607,18 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           endSection: 4,
           startWeek: 1,
           endWeek: 16,
+        ),
+        YsCourse(
+          id: 'lab',
+          name: '环境监测实验',
+          teacher: '孙老师',
+          location: '实验楼 404',
+          weekday: 5,
+          startSection: 7,
+          endSection: 9,
+          startWeek: 1,
+          endWeek: 12,
+          materials: ['实验服', '护目镜'],
         ),
         YsCourse(
           id: 'field',
@@ -507,18 +634,84 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
           custom: true,
           materials: ['相机', '访谈提纲'],
         ),
+        YsCourse(
+          id: 'reading',
+          name: '文献研读',
+          teacher: '学习小组',
+          location: '图书馆 B 区',
+          weekday: 7,
+          startSection: 5,
+          endSection: 6,
+          startWeek: 1,
+          endWeek: 20,
+          custom: true,
+        ),
       ];
 
   YsWeatherSnapshot _demoWeather(DateTime now) {
-    final start = now.subtract(const Duration(days: 7));
+    final today = DateTime(now.year, now.month, now.day);
+    final currentMonday = today.subtract(Duration(days: today.weekday - 1));
+    final start = currentMonday.subtract(const Duration(days: 7));
     final kinds = [
       YsWeatherKind.clear,
       YsWeatherKind.cloudy,
+      YsWeatherKind.overcast,
+      YsWeatherKind.fog,
       YsWeatherKind.rain,
       YsWeatherKind.heavyRain,
       YsWeatherKind.storm,
       YsWeatherKind.drizzle,
       YsWeatherKind.snow,
+    ];
+    final hourlyKinds = <List<YsWeatherKind>>[
+      [
+        YsWeatherKind.clear,
+        YsWeatherKind.cloudy,
+        YsWeatherKind.drizzle,
+        YsWeatherKind.snow,
+        YsWeatherKind.rain,
+        YsWeatherKind.overcast,
+      ],
+      [
+        YsWeatherKind.snow,
+        YsWeatherKind.clear,
+        YsWeatherKind.cloudy,
+        YsWeatherKind.fog,
+        YsWeatherKind.rain,
+        YsWeatherKind.storm,
+      ],
+      [
+        YsWeatherKind.cloudy,
+        YsWeatherKind.rain,
+        YsWeatherKind.clear,
+        YsWeatherKind.snow,
+        YsWeatherKind.overcast,
+        YsWeatherKind.fog,
+      ],
+      [
+        YsWeatherKind.fog,
+        YsWeatherKind.clear,
+        YsWeatherKind.drizzle,
+        YsWeatherKind.storm,
+        YsWeatherKind.cloudy,
+        YsWeatherKind.rain,
+      ],
+      [
+        YsWeatherKind.snow,
+        YsWeatherKind.overcast,
+        YsWeatherKind.clear,
+        YsWeatherKind.heavyRain,
+        YsWeatherKind.fog,
+        YsWeatherKind.cloudy,
+      ],
+    ];
+    const hourlySlots = <(int, int)>[
+      (8, 0),
+      (10, 0),
+      (14, 30),
+      (16, 20),
+      (18, 10),
+      (19, 30),
     ];
     return YsWeatherSnapshot(
       current: const YsCurrentWeather(
@@ -535,6 +728,24 @@ class _ShowcaseHomeState extends State<_ShowcaseHome> {
             highC: 27 + index % 4,
             label: ysWeatherLabel(kinds[index % kinds.length]),
           ),
+      ],
+      hourly: [
+        for (var dayIndex = 0; dayIndex < 21; dayIndex++)
+          for (var slotIndex = 0; slotIndex < hourlySlots.length; slotIndex++)
+            YsHourlyWeather(
+              time: DateTime(
+                start.add(Duration(days: dayIndex)).year,
+                start.add(Duration(days: dayIndex)).month,
+                start.add(Duration(days: dayIndex)).day,
+                hourlySlots[slotIndex].$1,
+                hourlySlots[slotIndex].$2,
+              ),
+              kind: hourlyKinds[dayIndex % hourlyKinds.length][slotIndex],
+              temperatureC: 26 - dayIndex % 5 - slotIndex * 0.8,
+              label: ysWeatherLabel(
+                hourlyKinds[dayIndex % hourlyKinds.length][slotIndex],
+              ),
+            ),
       ],
       updatedAt: DateTime.now(),
     );

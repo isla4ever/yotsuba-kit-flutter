@@ -899,7 +899,12 @@ class _GridBody extends StatelessWidget {
       cell.week,
       course.weekday,
     );
-    final dailyWeather = weather?.weatherForDate(ScheduleEngine.dateKey(date));
+    final startTime = course.startSection <= courseTimes.length
+        ? courseTimes[course.startSection - 1].start
+        : null;
+    final dailyWeather = startTime == null
+        ? weather?.weatherForDate(ScheduleEngine.dateKey(date))
+        : weather?.weatherForDateTime(_courseDateTime(date, startTime));
     Widget child = Stack(
       clipBehavior: Clip.none,
       children: [
@@ -935,6 +940,13 @@ class _GridBody extends StatelessWidget {
       child: child,
     );
   }
+}
+
+DateTime _courseDateTime(DateTime date, String time) {
+  final parts = time.split(':');
+  final hour = int.tryParse(parts.first) ?? 0;
+  final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+  return DateTime(date.year, date.month, date.day, hour, minute);
 }
 
 class _WaveReveal extends StatelessWidget {
@@ -1107,6 +1119,43 @@ class _CourseCard extends StatelessWidget {
     final cardColor = active ? Color(course.colorValue) : palette.surfaceRaised;
     final foreground = active ? Colors.white : palette.textSoft;
     final status = active ? '' : '非本周';
+    Widget? weatherLayer;
+    if (weather != null) {
+      weatherLayer = WeatherCardLayer(
+        kind: weatherPresentation(weather!.weatherCode).kind,
+        reduceMotion: reduceMotion,
+      );
+      if (!active) {
+        weatherLayer = Opacity(
+          opacity: 0.16,
+          child: ColorFiltered(
+            colorFilter: const ColorFilter.matrix([
+              0.2126,
+              0.7152,
+              0.0722,
+              0,
+              0,
+              0.2126,
+              0.7152,
+              0.0722,
+              0,
+              0,
+              0.2126,
+              0.7152,
+              0.0722,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+            ]),
+            child: weatherLayer,
+          ),
+        );
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.all(4),
@@ -1126,88 +1175,99 @@ class _CourseCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (active && weather != null)
-                IgnorePointer(
-                  child: WeatherCardLayer(
-                    kind: weatherPresentation(weather!.weatherCode).kind,
-                    reduceMotion: reduceMotion,
-                  ),
-                ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(5, 5, 5, span == 1 ? 15 : 18),
-                child: Stack(
-                  children: [
-                    if (status.isNotEmpty)
-                      Align(
-                        alignment: Alignment.topCenter,
-                        child: Container(
-                          height: 14,
-                          constraints: const BoxConstraints(minWidth: 34),
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: palette.surface,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(
-                            status,
-                            style: TextStyle(
-                              fontSize: 7,
-                              fontWeight: FontWeight.w700,
-                              color: palette.text,
+              if (weatherLayer != null) IgnorePointer(child: weatherLayer),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxHeight <= 118;
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      5,
+                      5,
+                      5,
+                      compact ? 15 : (span == 1 ? 15 : 18),
+                    ),
+                    child: Stack(
+                      children: [
+                        if (status.isNotEmpty)
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: Container(
+                              height: 14,
+                              constraints: const BoxConstraints(minWidth: 34),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: palette.surface,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.w700,
+                                  color: palette.text,
+                                ),
+                              ),
                             ),
                           ),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: status.isEmpty ? 0 : (compact ? 8 : 10),
+                            bottom: compact ? 9 : 12,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                course.name,
+                                maxLines: compact ? 2 : (span == 1 ? 2 : 3),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  height: compact
+                                      ? 1.12
+                                      : (span == 1 ? 1.15 : 1.22),
+                                  fontSize: compact ? 9 : (span == 1 ? 10 : 12),
+                                  fontWeight: FontWeight.w800,
+                                  color: foreground,
+                                ),
+                              ),
+                              if (span > 1 && course.room.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  '@${course.room}',
+                                  maxLines: compact ? 1 : 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    height: 1.15,
+                                    fontSize: compact ? 8 : 9,
+                                    color: foreground.withValues(alpha: 0.86),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                      ),
-                    Padding(
-                      padding: EdgeInsets.only(top: status.isEmpty ? 0 : 10),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            course.name,
-                            maxLines: span == 1 ? 2 : 3,
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Text(
+                            '(${course.startWeek}-${course.endWeek}周)',
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              height: span == 1 ? 1.15 : 1.22,
-                              fontSize: span == 1 ? 10 : 12,
-                              fontWeight: FontWeight.w800,
-                              color: foreground,
+                              fontSize: compact || span == 1 ? 7 : 8,
+                              color: foreground.withValues(alpha: 0.88),
                             ),
                           ),
-                          if (span > 1 && course.room.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              '@${course.room}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                height: 1.15,
-                                fontSize: 9,
-                                color: foreground.withValues(alpha: 0.86),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Text(
-                        '(${course.startWeek}-${course.endWeek}周)',
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: span == 1 ? 7 : 8,
-                          color: foreground.withValues(alpha: 0.88),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ],
           ),

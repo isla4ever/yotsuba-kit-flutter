@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
+import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
-import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
-import 'package:yotsuba_schedule/features/onboarding/application/schedule_onboarding_controller.dart';
-import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
 import 'package:yotsuba_schedule/features/announcements/presentation/announcement_manager_sheet.dart';
+import 'package:yotsuba_schedule/features/schedule/application/schedule_controller.dart';
 import 'package:yotsuba_schedule/features/settings/presentation/academic_calendar_sheet.dart';
+import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -21,7 +20,7 @@ class SettingsScreen extends ConsumerWidget {
     final weather = ref.watch(weatherControllerProvider);
 
     return ColoredBox(
-      color: palette.canvas,
+      color: palette.canvas.withValues(alpha: 0.72),
       child: SafeArea(
         bottom: false,
         child: ListView(
@@ -87,15 +86,6 @@ class SettingsScreen extends ConsumerWidget {
             const _SectionLabel(label: '操作'),
             _SettingsCard(
               children: [
-                _InfoRow(
-                  icon: Icons.school_outlined,
-                  title: '课表操作引导',
-                  subtitle: '重新查看换周、日计划、课程详情和编辑入口',
-                  onTap: () {
-                    ref.read(scheduleOnboardingProvider.notifier).replay();
-                    context.go('/schedule');
-                  },
-                ),
                 _InfoRow(
                   icon: Icons.date_range_outlined,
                   title: '学期、节假日与补班',
@@ -188,6 +178,7 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      animationStyle: appModalAnimationStyle,
       builder: (context) => AlertDialog(
         title: const Text('恢复示例数据？'),
         content: const Text('本地新增的待办和课程将被重置为开源演示数据。'),
