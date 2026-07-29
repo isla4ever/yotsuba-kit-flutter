@@ -123,6 +123,76 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets(
+    'inactive leaving overlap never flashes above a new active card',
+    (tester) async {
+      const overlapping = [
+        Course(
+          id: 'z-active-week-one',
+          name: '本周课程',
+          teacher: '陈老师',
+          room: '教1-101',
+          weekday: 4,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 1,
+          colorValue: 0xFF486FCB,
+        ),
+        Course(
+          id: 'a-inactive-leaving',
+          name: '底层非本周课程',
+          teacher: '李老师',
+          room: '教1-102',
+          weekday: 4,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 3,
+          endWeek: 3,
+          colorValue: 0xFF8F6D4E,
+        ),
+      ];
+      var week = 2;
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return Scaffold(
+                body: WeekTimetable(
+                  termStart: DateTime(2026, 3, 2),
+                  week: week,
+                  courses: overlapping,
+                  visibleDays: 7,
+                  rowHeight: 52,
+                  courseTimes: standardCourseTimes,
+                  dayOverrides: const [],
+                  weather: null,
+                  editing: false,
+                  reduceMotion: false,
+                  onCourseTap: (_) {},
+                  onEmptyCellTap: (_, _, _) {},
+                  onDayTap: (_) {},
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      expect(find.text('底层非本周课程'), findsOneWidget);
+
+      setOuter(() => week = 1);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(find.text('本周课程'), findsOneWidget);
+      expect(find.text('底层非本周课程'), findsNothing);
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('reduce motion swaps weeks instantly without wave layers', (
     tester,
   ) async {

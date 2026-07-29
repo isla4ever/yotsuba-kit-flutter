@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Prevented inactive leaving overlap cards from showing through while a new active course animates into the same timetable slot.
+- Added package and full-app widget regression tests for the affected wave-transition frame.
+
 ## 0.7.0
 
 - Reworked course weather into localized micro-motion: sun halo, drifting cloud edge, glass rain traces, storm refraction, frost points, and feathered fog.

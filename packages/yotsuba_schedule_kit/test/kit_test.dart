@@ -155,6 +155,55 @@ void main() {
       expect(find.text('非本周'), findsOneWidget);
     });
 
+    testWidgets(
+        'wave never reveals an inactive leaving overlap above a new active course',
+        (tester) async {
+      const overlapping = [
+        YsCourse(
+          id: 'active-week-one',
+          name: '本周课程',
+          weekday: 4,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 1,
+          endWeek: 1,
+        ),
+        YsCourse(
+          id: 'inactive-leaving',
+          name: '底层非本周课程',
+          weekday: 4,
+          startSection: 1,
+          endSection: 2,
+          startWeek: 3,
+          endWeek: 3,
+        ),
+      ];
+      var week = 2;
+      late StateSetter setOuter;
+      await tester.pumpWidget(MaterialApp(
+        home: StatefulBuilder(builder: (context, setState) {
+          setOuter = setState;
+          return Scaffold(
+            body: YsWeekTimetable(
+              week: week,
+              courses: overlapping,
+              cardEffect: YsCardEffect.none,
+            ),
+          );
+        }),
+      ));
+      expect(find.text('底层非本周课程'), findsOneWidget);
+
+      setOuter(() => week = 1);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(find.text('本周课程'), findsOneWidget);
+      expect(find.text('底层非本周课程'), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text('本周课程'), findsOneWidget);
+    });
+
     testWidgets('reports course taps with the overlap stack', (tester) async {
       YsDisplayCourse? tapped;
       await tester.pumpWidget(MaterialApp(

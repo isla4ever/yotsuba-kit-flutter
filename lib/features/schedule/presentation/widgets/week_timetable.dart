@@ -665,14 +665,20 @@ class _GridBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final cells = _cellViews(week);
-    final leavingCells = leavingWeek != null
+    final allLeavingCells = leavingWeek != null
         ? _cellViews(leavingWeek!)
         : const <_CellView>[];
+    final currentByCell = {for (final cell in cells) cell.cellKey: cell};
+    final leavingCells = allLeavingCells
+        .where(
+          (cell) => _canPaintLeavingCell(cell, currentByCell[cell.cellKey]),
+        )
+        .toList(growable: false);
     final currentSignatures = {
       for (final cell in cells) cell.cellKey: cell.signature,
     };
     final leavingSignatures = {
-      for (final cell in leavingCells) cell.cellKey: cell.signature,
+      for (final cell in allLeavingCells) cell.cellKey: cell.signature,
     };
 
     return ClipRect(
@@ -828,6 +834,12 @@ class _GridBody extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  bool _canPaintLeavingCell(_CellView leaving, _CellView? current) {
+    return leaving.top.occursInWeek(leaving.week) ||
+        current == null ||
+        !current.top.occursInWeek(current.week);
   }
 
   List<_CellView> _cellViews(int targetWeek) {

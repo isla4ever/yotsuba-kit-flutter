@@ -326,13 +326,18 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
   Widget _buildGrid(double dayWidth) {
     final theme = widget.theme;
     final cells = _cellViews(widget.week);
-    final leavingCells =
+    final allLeavingCells =
         _leavingWeek != null ? _cellViews(_leavingWeek!) : const <_CellView>[];
+    final currentByCell = {for (final cell in cells) cell.cellKey: cell};
+    final leavingCells = allLeavingCells
+        .where(
+            (cell) => _canPaintLeavingCell(cell, currentByCell[cell.cellKey]))
+        .toList(growable: false);
     final currentSignatures = {
       for (final cell in cells) cell.cellKey: cell.signature,
     };
     final leavingSignatures = {
-      for (final cell in leavingCells) cell.cellKey: cell.signature,
+      for (final cell in allLeavingCells) cell.cellKey: cell.signature,
     };
 
     return ClipRect(
@@ -405,6 +410,10 @@ class _YsWeekTimetableState extends State<YsWeekTimetable>
         ],
       ]),
     );
+  }
+
+  bool _canPaintLeavingCell(_CellView leaving, _CellView? current) {
+    return leaving.top.active || current == null || !current.top.active;
   }
 
   List<_CellView> _cellViews(int week) {
