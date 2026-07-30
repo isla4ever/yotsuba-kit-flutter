@@ -8,6 +8,7 @@ Yotsuba Kit Flutter 是面向中国高校课表与课程日程产品的 Flutter 
 
 | 入口 | 地址 | 说明 |
 | --- | --- | --- |
+| **Android 应用下载** | [GitHub Releases](https://github.com/isla4ever/yotsuba-kit-flutter/releases/latest) | 下载签名 APK，无需源码和 Flutter 环境 |
 | **Flutter 组件包** | [pub.dev/packages/yotsuba_schedule_kit](https://pub.dev/packages/yotsuba_schedule_kit) | 安装说明、版本与包元数据 |
 | **Flutter 接入文档** | [官网 Flutter 指南](https://isla4ever.github.io/yotsuba-kit/frameworks/flutter.html) | 数据模型、天气、Today 与平台能力边界 |
 | **组件示例源码** | [`packages/yotsuba_schedule_kit/example/`](packages/yotsuba_schedule_kit/example) | 只使用组件包公开 API 的课表 / Today 示例 |
@@ -66,6 +67,12 @@ Yotsuba Kit Flutter 是面向中国高校课表与课程日程产品的 Flutter 
 - Flutter 依赖：`yotsuba_schedule_kit`
 
 Flutter 的 `YsSchedule` / `YsToday`、Web 的 `<YsSchedule>` / `<YsToday>` 和原生 Elements 使用相同的课程、天气、详情、弹窗和布局概念。平台相关能力仍由各自宿主接入，不把网络权限或系统副作用塞进 UI 组件。
+
+## 直接体验 Android 应用
+
+无需安装 Flutter 或下载源码，可前往 [GitHub Releases](https://github.com/isla4ever/yotsuba-kit-flutter/releases/latest) 下载最新的通用 APK。应用支持 Android 7.0 及以上版本；首次从浏览器安装时，系统可能要求确认允许该来源安装应用。
+
+每个 Release 同时提供 APK 的 SHA-256 校验文件。正式 APK 使用项目专属密钥签名，后续版本可直接覆盖升级。
 
 ## 运行完整应用
 
