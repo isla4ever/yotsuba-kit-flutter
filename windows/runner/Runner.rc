@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "love.yotsuba" "\0"
-            VALUE "FileDescription", "yotsuba_schedule" "\0"
+            VALUE "FileDescription", "Yotsuba Schedule" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "yotsuba_schedule" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 love.yotsuba. All rights reserved." "\0"
             VALUE "OriginalFilename", "yotsuba_schedule.exe" "\0"
-            VALUE "ProductName", "yotsuba_schedule" "\0"
+            VALUE "ProductName", "Yotsuba Schedule" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

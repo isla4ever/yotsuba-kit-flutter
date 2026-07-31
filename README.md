@@ -1,8 +1,22 @@
-# Yotsuba Kit Flutter
+<p align="center">
+  <img src="assets/branding/yotsuba-app-icon-source.png" width="112" alt="Yotsuba Schedule 产品图标">
+</p>
 
-Yotsuba Kit Flutter 是面向中国高校课表与课程日程产品的 Flutter 开源实现。仓库同时提供可复用组件包、只依赖公开 API 的示例工程，以及具备离线数据与系统能力的完整应用。
+<h1 align="center">Yotsuba Kit Flutter</h1>
 
-它与 Web 版本共享课程、学期、天气、详情、弹层和 Today 的产品语义，同时保持 Flutter 原生实现：Material 控件、自适应弹层、系统减少动态效果，以及面向触摸的 Today 布局编辑。
+<p align="center">面向中国高校的跨平台课表、Today 看板与可复用 Flutter 组件库。</p>
+
+<p align="center">
+  <a href="https://github.com/isla4ever/yotsuba-kit-flutter/releases/latest"><img src="https://img.shields.io/github/v/release/isla4ever/yotsuba-kit-flutter?label=Android%20Release" alt="Android Release"></a>
+  <a href="https://pub.dev/packages/yotsuba_schedule_kit"><img src="https://img.shields.io/pub/v/yotsuba_schedule_kit?label=pub.dev" alt="pub.dev"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/isla4ever/yotsuba-kit-flutter" alt="MIT License"></a>
+</p>
+
+<p align="center">
+  <img src="assets/branding/yotsuba-readme-hero.png" width="100%" alt="Yotsuba Schedule 课表与天气产品主视觉">
+</p>
+
+Yotsuba Kit Flutter 同时提供可复用组件包、只依赖公开 API 的示例工程，以及具备离线数据与系统能力的完整应用。它与 Web 版本共享课程、学期、天气、详情、弹层和 Today 的产品语义，同时保持 Flutter 原生交互与系统能力。
 
 ## 快速入口
 
@@ -42,6 +56,21 @@ Yotsuba Kit Flutter 是面向中国高校课表与课程日程产品的 Flutter 
 | `packages/yotsuba_schedule_kit/example/` | package 演示：课表 / 今日 / 设置，所有功能只调用公开 API |
 
 依赖包文档见 [`packages/yotsuba_schedule_kit/README.md`](packages/yotsuba_schedule_kit/README.md)。
+
+## 统一品牌资产
+
+| 平台 | 接入方式 |
+| --- | --- |
+| Android | Adaptive Icon 与全密度 Launcher 图标 |
+| iOS / iPadOS | AppIcon Asset Catalog，含 20px 至 1024px 全套尺寸 |
+| Web / PWA | Favicon、192px / 512px 与 Maskable 图标 |
+| macOS | AppIcon Asset Catalog，含 16px 至 1024px 全套尺寸 |
+| Windows | 内嵌在 Runner 资源中的 256px ICO |
+| Linux | 随 Bundle 安装并由 GTK 窗口加载的 512px PNG |
+
+- 高清图标源文件：[`assets/branding/yotsuba-app-icon-source.png`](assets/branding/yotsuba-app-icon-source.png)
+- GitHub 横版主视觉：[`assets/branding/yotsuba-readme-hero.png`](assets/branding/yotsuba-readme-hero.png)
+- 品牌构图以课表为主体，天气和四叶草只作为辅助识别元素。
 
 ## 组件能力
 
