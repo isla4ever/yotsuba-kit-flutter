@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/yotsuba-app-icon-source.png" width="112" alt="Yotsuba Schedule 产品图标">
+  <img src="assets/branding/yotsuba-readme-icon.png" width="112" alt="Yotsuba Schedule 产品图标">
 </p>
 
 <h1 align="center">Yotsuba Kit Flutter</h1>
