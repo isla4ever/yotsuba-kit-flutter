@@ -112,6 +112,47 @@ class TodayTaskPanel extends StatelessWidget {
       TodayTileSize.twoByTwo => 3,
     };
     final visible = tasks.take(itemLimit).toList();
+    if (compact) {
+      final completed = tasks.where((task) => task.completed).length;
+      final pending = tasks.length - completed;
+      return TodayPanel(
+        padding: const EdgeInsets.all(10),
+        child: InkWell(
+          onTap: onAdd,
+          borderRadius: BorderRadius.circular(7),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '今日计划 · 剩 $pending 项',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: context.palette.textFaint,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$completed/${tasks.length}',
+                style: TextStyle(
+                  height: 1,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w800,
+                  color: context.palette.text,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '已完成',
+                style: TextStyle(fontSize: 9, color: context.palette.textSoft),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return TodayPanel(
       padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
@@ -378,6 +419,43 @@ class TodayCourseWorkPanel extends StatelessWidget {
         .where((plan) => !plan.completed)
         .take(itemLimit)
         .toList();
+    if (compact) {
+      return TodayPanel(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '课程任务 · 剩 ${pending.length} 项',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: context.palette.textFaint,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${pending.length}',
+              style: TextStyle(
+                height: 1,
+                fontSize: 25,
+                fontWeight: FontWeight.w800,
+                color: context.palette.text,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              pending.isEmpty ? '暂无待完成任务' : pending.first.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 9, color: context.palette.textSoft),
+            ),
+          ],
+        ),
+      );
+    }
     return TodayPanel(
       padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
@@ -676,6 +754,7 @@ class TodayMaterialsPanel extends StatelessWidget {
                             course: visible[index].$1,
                             names: visible[index].$2,
                             compact: true,
+                            dense: true,
                             onTap: () => onOpenCourse(visible[index].$1),
                           ),
                         ),
@@ -842,12 +921,14 @@ class _MaterialCourseCard extends StatelessWidget {
     required this.course,
     required this.names,
     required this.compact,
+    this.dense = false,
     required this.onTap,
   });
 
   final Course course;
   final List<String> names;
   final bool compact;
+  final bool dense;
   final VoidCallback onTap;
 
   @override
@@ -857,8 +938,11 @@ class _MaterialCourseCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(7),
       child: Container(
-        constraints: BoxConstraints(minHeight: compact ? 64 : 60),
-        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9, vertical: 7),
+        constraints: BoxConstraints(minHeight: dense ? 0 : (compact ? 64 : 60)),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 7 : 9,
+          vertical: dense ? 4 : 7,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -897,19 +981,19 @@ class _MaterialCourseCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: compact ? 10 : 11,
+                      fontSize: dense ? 9 : (compact ? 10 : 11),
                       fontWeight: FontWeight.w700,
                       color: palette.textSoft,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  SizedBox(height: dense ? 1 : 5),
                   Text(
-                    names.take(compact ? 2 : 3).join(' · '),
-                    maxLines: compact ? 2 : 1,
+                    names.take(dense ? 1 : (compact ? 2 : 3)).join(' · '),
+                    maxLines: dense ? 1 : (compact ? 2 : 1),
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       height: 1.15,
-                      fontSize: compact ? 10 : 11,
+                      fontSize: dense ? 9 : (compact ? 10 : 11),
                       fontWeight: FontWeight.w800,
                       color: palette.text,
                     ),

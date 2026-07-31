@@ -5,7 +5,7 @@ import 'package:yotsuba_schedule/features/shell/app_shell.dart';
 import 'package:yotsuba_schedule/features/today/presentation/today_screen.dart';
 
 final appRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/schedule',
   routes: [
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
@@ -15,18 +15,18 @@ final appRouter = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/',
+              path: '/schedule',
               pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: TodayScreen()),
+                  const NoTransitionPage(child: ScheduleScreen()),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/schedule',
+              path: '/',
               pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: ScheduleScreen()),
+                  const NoTransitionPage(child: TodayScreen()),
             ),
           ],
         ),

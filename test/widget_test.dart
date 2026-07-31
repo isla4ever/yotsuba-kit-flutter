@@ -33,11 +33,11 @@ void main() {
     await tester.pumpWidget(testApp());
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('今日'), findsOneWidget);
+    expect(find.text('今日'), findsWidgets);
     expect(find.text('课表'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
-    expect(find.text('今日指挥台'), findsOneWidget);
-    expect(find.text('课程时间轴'), findsOneWidget);
+    expect(find.text('今日天气'), findsOneWidget);
+    expect(find.textContaining('今日课程'), findsWidgets);
   });
 
   testWidgets('switches from today to the weekly timetable', (tester) async {
@@ -62,10 +62,15 @@ void main() {
     await tester.pumpWidget(testApp());
     await tester.pump(const Duration(milliseconds: 300));
 
-    final tasks = tester.getTopLeft(find.text('还要做什么'));
-    final courseWork = tester.getTopLeft(find.text('临近截止'));
-    expect((tasks.dy - courseWork.dy).abs(), lessThan(8));
-    expect(courseWork.dx, greaterThan(tasks.dx));
+    final readiness = tester.getTopLeft(find.text('记得带'));
+    final courseWork = tester.getTopLeft(find.textContaining('课程任务 · 剩'));
+    expect((readiness.dy - courseWork.dy).abs(), lessThan(8));
+    expect(courseWork.dx, greaterThan(readiness.dx));
+
+    final tasks = tester.getTopLeft(find.textContaining('今日计划 · 剩'));
+    final weekGlance = tester.getTopLeft(find.text('概览'));
+    expect((tasks.dy - weekGlance.dy).abs(), lessThan(8));
+    expect(weekGlance.dx, greaterThan(tasks.dx));
     expect(tester.takeException(), isNull);
   });
 }

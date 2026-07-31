@@ -5,6 +5,8 @@ import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/week_timetable.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
+import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart'
+    show YsTransition;
 
 const _stableCourse = Course(
   id: 'stable',
@@ -33,10 +35,15 @@ const _weekOneCourse = Course(
 );
 
 class _Harness extends StatefulWidget {
-  const _Harness({required this.initialWeek, required this.reduceMotion});
+  const _Harness({
+    required this.initialWeek,
+    required this.reduceMotion,
+    this.transition = YsTransition.wave,
+  });
 
   final int initialWeek;
   final bool reduceMotion;
+  final YsTransition transition;
 
   static _HarnessState of(WidgetTester tester) =>
       tester.state<_HarnessState>(find.byType(_Harness));
@@ -63,6 +70,7 @@ class _HarnessState extends State<_Harness> {
       weather: null,
       editing: false,
       reduceMotion: widget.reduceMotion,
+      transition: widget.transition,
       onCourseTap: (_) {},
       onEmptyCellTap: (_, _, _) {},
       onDayTap: (_) {},
@@ -73,12 +81,17 @@ class _HarnessState extends State<_Harness> {
 Future<void> _pumpTimetable(
   WidgetTester tester, {
   required bool reduceMotion,
+  YsTransition transition = YsTransition.wave,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
       home: Scaffold(
-        body: _Harness(initialWeek: 1, reduceMotion: reduceMotion),
+        body: _Harness(
+          initialWeek: 1,
+          reduceMotion: reduceMotion,
+          transition: transition,
+        ),
       ),
     ),
   );
@@ -206,6 +219,93 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('体育'), findsOneWidget);
   });
+
+  for (final transition in YsTransition.values) {
+    testWidgets('${transition.name} transition keeps the timetable stable', (
+      tester,
+    ) async {
+      await _pumpTimetable(tester, reduceMotion: false, transition: transition);
+      _Harness.of(tester).setWeek(2);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 180));
+      expect(find.text('高等数学'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(find.text('非本周'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final visibleDays in [5, 6, 7]) {
+    testWidgets('$visibleDays-day layout keeps weekend cards weather-linked', (
+      tester,
+    ) async {
+      final courses = [
+        for (var day = 1; day <= 7; day++)
+          Course(
+            id: 'day-$day',
+            name: '第$day日课程',
+            teacher: '陈老师',
+            room: '教$day-101',
+            weekday: day,
+            startSection: 1,
+            endSection: 2,
+            startWeek: 1,
+            endWeek: 20,
+            colorValue: 0xFF486FCB,
+          ),
+      ];
+      final weather = WeatherSnapshot(
+        latitude: 39.1,
+        longitude: 117.2,
+        timezone: 'Asia/Shanghai',
+        currentTemperature: 28,
+        currentWeatherCode: 0,
+        fetchedAt: DateTime(2026, 3, 2),
+        daily: [
+          for (var day = 0; day < 7; day++)
+            DailyWeather(
+              dateKey: '2026-03-${(2 + day).toString().padLeft(2, '0')}',
+              weatherCode: day,
+              temperatureMin: 18,
+              temperatureMax: 26,
+            ),
+        ],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              height: 720,
+              child: WeekTimetable(
+                termStart: DateTime(2026, 3, 2),
+                week: 1,
+                courses: courses,
+                visibleDays: visibleDays,
+                rowHeight: 52,
+                courseTimes: standardCourseTimes,
+                dayOverrides: const [],
+                weather: weather,
+                editing: false,
+                reduceMotion: true,
+                onCourseTap: (_) {},
+                onEmptyCellTap: (_, _, _) {},
+                onDayTap: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (var day = 1; day <= visibleDays; day++) {
+        expect(find.text('第$day日课程'), findsOneWidget);
+      }
+      expect(find.byType(WeatherCardLayer), findsNWidgets(visibleDays));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('inactive courses keep weather structure in a muted filter', (
     tester,

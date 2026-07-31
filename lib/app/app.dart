@@ -16,8 +16,8 @@ class YotsubaScheduleApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
       themeMode: settings.themeMode,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(settings.schedulePalette),
+      darkTheme: AppTheme.dark(settings.schedulePalette),
       themeAnimationDuration: settings.reduceMotion
           ? Duration.zero
           : const Duration(milliseconds: 220),

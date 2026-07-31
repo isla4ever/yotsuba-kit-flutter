@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
@@ -9,6 +10,7 @@ import 'package:yotsuba_schedule/domain/models/academic_calendar.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_glyph.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
+import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart';
 
 /// 波浪覆盖换周：骨架（表头、时间轴、格线）常驻不动，旧周课程留在下层，
 /// 新周课程按“列为主、节次为辅”的对角线次序覆盖上来，任何一帧都不出现空网格。
@@ -77,6 +79,10 @@ class WeekTimetable extends StatefulWidget {
     required this.onCourseTap,
     required this.onEmptyCellTap,
     required this.onDayTap,
+    this.showWeekdayBar = true,
+    this.density = YsScheduleDensity.normal,
+    this.transition = YsTransition.wave,
+    this.cardStyle = CourseCardStyle.weather,
     this.onSwipeWeek,
     this.dayGuideKey,
     this.courseGuideKey,
@@ -97,6 +103,10 @@ class WeekTimetable extends StatefulWidget {
   final void Function(int weekday, int startSection, int endSection)
   onEmptyCellTap;
   final ValueChanged<int> onDayTap;
+  final bool showWeekdayBar;
+  final YsScheduleDensity density;
+  final YsTransition transition;
+  final CourseCardStyle cardStyle;
 
   /// 非编辑模式下水平滑动换周，参数为 +1（下一周）或 -1（上一周）。
   final ValueChanged<int>? onSwipeWeek;
@@ -132,7 +142,7 @@ class _WeekTimetableState extends State<WeekTimetable>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.week != widget.week) {
       _waveForward = widget.week > oldWidget.week;
-      if (widget.reduceMotion) {
+      if (widget.reduceMotion || widget.transition == YsTransition.none) {
         _leavingWeek = null;
         _wave.value = 1;
       } else {
@@ -167,20 +177,22 @@ class _WeekTimetableState extends State<WeekTimetable>
             widget.visibleDays;
         return Column(
           children: [
-            _WeekHeader(
-              termStart: widget.termStart,
-              week: widget.week,
-              dayWidth: dayWidth,
-              visibleDays: widget.visibleDays,
-              editing: widget.editing,
-              dayOverrides: widget.dayOverrides,
-              weather: widget.weather,
-              wave: _wave,
-              waving: _leavingWeek != null,
-              waveForward: _waveForward,
-              onDayTap: widget.onDayTap,
-              dayGuideKey: widget.dayGuideKey,
-            ),
+            if (widget.showWeekdayBar)
+              _WeekHeader(
+                termStart: widget.termStart,
+                week: widget.week,
+                dayWidth: dayWidth,
+                visibleDays: widget.visibleDays,
+                editing: widget.editing,
+                dayOverrides: widget.dayOverrides,
+                weather: widget.weather,
+                density: widget.density,
+                wave: _wave,
+                waving: _leavingWeek != null,
+                waveForward: _waveForward,
+                onDayTap: widget.onDayTap,
+                dayGuideKey: widget.dayGuideKey,
+              ),
             Expanded(
               child: SingleChildScrollView(
                 child: SizedBox(
@@ -233,6 +245,9 @@ class _WeekTimetableState extends State<WeekTimetable>
                       courseTimes: widget.courseTimes,
                       weather: widget.weather,
                       reduceMotion: widget.reduceMotion,
+                      density: widget.density,
+                      transition: widget.transition,
+                      cardStyle: widget.cardStyle,
                       selectionDay: _selectionDay,
                       selectionStart: _selectionStart,
                       selectionEnd: _selectionEnd,
@@ -363,6 +378,7 @@ class _WeekHeader extends StatelessWidget {
     required this.editing,
     required this.dayOverrides,
     required this.weather,
+    required this.density,
     required this.wave,
     required this.waving,
     required this.waveForward,
@@ -377,6 +393,7 @@ class _WeekHeader extends StatelessWidget {
   final bool editing;
   final List<AcademicDayOverride> dayOverrides;
   final WeatherSnapshot? weather;
+  final YsScheduleDensity density;
   final Animation<double> wave;
   final bool waving;
   final bool waveForward;
@@ -439,6 +456,7 @@ class _WeekHeader extends StatelessWidget {
                   weather: weather?.weatherForDate(
                     ScheduleEngine.dateKey(date),
                   ),
+                  density: density,
                   editing: editing,
                   isLast: day == visibleDays,
                   onTap: () => onDayTap(day),
@@ -483,6 +501,7 @@ class _DayHeader extends StatelessWidget {
     required this.date,
     required this.dayOverride,
     required this.weather,
+    required this.density,
     required this.editing,
     required this.isLast,
     required this.onTap,
@@ -493,6 +512,7 @@ class _DayHeader extends StatelessWidget {
   final DateTime date;
   final AcademicDayOverride? dayOverride;
   final DailyWeather? weather;
+  final YsScheduleDensity density;
   final bool editing;
   final bool isLast;
   final VoidCallback onTap;
@@ -535,7 +555,8 @@ class _DayHeader extends StatelessWidget {
                               : palette.textSoft,
                         ),
                       ),
-                      if (weather != null) ...[
+                      if (weather != null &&
+                          density != YsScheduleDensity.minimal) ...[
                         const SizedBox(width: 2),
                         WeatherGlyph(
                           kind: weatherPresentation(weather!.weatherCode).kind,
@@ -551,6 +572,11 @@ class _DayHeader extends StatelessWidget {
                     DateFormat('M/d').format(date),
                     style: TextStyle(fontSize: 9, color: palette.textFaint),
                   ),
+                  if (weather != null && density == YsScheduleDensity.rich)
+                    Text(
+                      '${weather!.temperatureMax.round()}°',
+                      style: TextStyle(fontSize: 8, color: palette.textFaint),
+                    ),
                   if (dayOverride != null)
                     Text(
                       dayOverride!.kind == AcademicDayKind.makeUp
@@ -619,6 +645,9 @@ class _GridBody extends StatelessWidget {
     required this.courseTimes,
     required this.weather,
     required this.reduceMotion,
+    required this.density,
+    required this.transition,
+    required this.cardStyle,
     required this.rowHeight,
     required this.dayWidth,
     required this.visibleDays,
@@ -642,6 +671,9 @@ class _GridBody extends StatelessWidget {
   final List<CourseTime> courseTimes;
   final WeatherSnapshot? weather;
   final bool reduceMotion;
+  final YsScheduleDensity density;
+  final YsTransition transition;
+  final CourseCardStyle cardStyle;
   final double rowHeight;
   final double dayWidth;
   final int visibleDays;
@@ -800,12 +832,14 @@ class _GridBody extends StatelessWidget {
                   cell,
                   reveal: _Wave.leave(
                     wave,
-                    _Wave.delayMs(
-                      weekday: cell.top.weekday,
-                      startSection: cell.top.startSection,
-                      forward: waveForward,
-                      visibleDays: visibleDays,
-                    ),
+                    transition == YsTransition.wave
+                        ? _Wave.delayMs(
+                            weekday: cell.top.weekday,
+                            startSection: cell.top.startSection,
+                            forward: waveForward,
+                            visibleDays: visibleDays,
+                          )
+                        : 0,
                   ),
                   leaving: true,
                 ),
@@ -820,12 +854,14 @@ class _GridBody extends StatelessWidget {
                             cells[index].signature
                     ? _Wave.enter(
                         wave,
-                        _Wave.delayMs(
-                          weekday: cells[index].top.weekday,
-                          startSection: cells[index].top.startSection,
-                          forward: waveForward,
-                          visibleDays: visibleDays,
-                        ),
+                        transition == YsTransition.wave
+                            ? _Wave.delayMs(
+                                weekday: cells[index].top.weekday,
+                                startSection: cells[index].top.startSection,
+                                forward: waveForward,
+                                visibleDays: visibleDays,
+                              )
+                            : 0,
                       )
                     : null,
                 leaving: false,
@@ -928,6 +964,8 @@ class _GridBody extends StatelessWidget {
               active: course.occursInWeek(cell.week),
               weather: dailyWeather,
               reduceMotion: reduceMotion || leaving,
+              density: density,
+              cardStyle: cardStyle,
               onTap: () => onCourseTap(course),
             ),
           ),
@@ -941,7 +979,13 @@ class _GridBody extends StatelessWidget {
       ],
     );
     if (reveal != null) {
-      child = _WaveReveal(reveal: reveal, leaving: leaving, child: child);
+      child = _CourseReveal(
+        reveal: reveal,
+        leaving: leaving,
+        transition: transition,
+        forward: waveForward,
+        child: child,
+      );
     }
     return Positioned(
       key: key,
@@ -961,15 +1005,19 @@ DateTime _courseDateTime(DateTime date, String time) {
   return DateTime(date.year, date.month, date.day, hour, minute);
 }
 
-class _WaveReveal extends StatelessWidget {
-  const _WaveReveal({
+class _CourseReveal extends StatelessWidget {
+  const _CourseReveal({
     required this.reveal,
     required this.leaving,
+    required this.transition,
+    required this.forward,
     required this.child,
   });
 
   final Animation<double> reveal;
   final bool leaving;
+  final YsTransition transition;
+  final bool forward;
   final Widget child;
 
   @override
@@ -979,16 +1027,42 @@ class _WaveReveal extends StatelessWidget {
       child: child,
       builder: (context, child) {
         final value = reveal.value;
-        if (leaving) {
-          return Opacity(opacity: 1 - value, child: child);
+        final progress = leaving ? 1 - value : value;
+        Widget transformed = child!;
+        switch (transition) {
+          case YsTransition.wave:
+            transformed = Transform.translate(
+              offset: Offset(0, (1 - progress) * 4),
+              child: transformed,
+            );
+          case YsTransition.slide:
+            transformed = Transform.translate(
+              offset: Offset((1 - progress) * (forward ? 14 : -14), 0),
+              child: transformed,
+            );
+          case YsTransition.fade || YsTransition.none:
+            break;
+          case YsTransition.cube:
+            final transform = Matrix4.identity()
+              ..setEntry(3, 2, 0.002)
+              ..rotateY((1 - progress) * (forward ? -0.18 : 0.18));
+            transformed = Transform(
+              transform: transform,
+              alignment: forward ? Alignment.centerRight : Alignment.centerLeft,
+              child: transformed,
+            );
+          case YsTransition.drop:
+            transformed = Transform.translate(
+              offset: Offset(0, (1 - progress) * -16),
+              child: transformed,
+            );
+          case YsTransition.zoom:
+            transformed = Transform.scale(
+              scale: 0.94 + 0.06 * progress,
+              child: transformed,
+            );
         }
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, (1 - value) * 4),
-            child: child,
-          ),
-        );
+        return Opacity(opacity: progress.clamp(0, 1), child: transformed);
       },
     );
   }
@@ -1114,6 +1188,8 @@ class _CourseCard extends StatelessWidget {
     required this.course,
     required this.active,
     required this.reduceMotion,
+    required this.density,
+    required this.cardStyle,
     required this.onTap,
     this.weather,
   });
@@ -1121,6 +1197,8 @@ class _CourseCard extends StatelessWidget {
   final Course course;
   final bool active;
   final bool reduceMotion;
+  final YsScheduleDensity density;
+  final CourseCardStyle cardStyle;
   final DailyWeather? weather;
   final VoidCallback onTap;
 
@@ -1128,11 +1206,17 @@ class _CourseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final span = math.max(1, course.endSection - course.startSection + 1);
-    final cardColor = active ? Color(course.colorValue) : palette.surfaceRaised;
+    final colorIndex = course.name.codeUnits.fold<int>(
+      0,
+      (value, unit) => (value * 31 + unit) & 0x7fffffff,
+    );
+    final cardColor = active
+        ? palette.courseColors[colorIndex % palette.courseColors.length]
+        : palette.surfaceRaised;
     final foreground = active ? Colors.white : palette.textSoft;
     final status = active ? '' : '非本周';
     Widget? weatherLayer;
-    if (weather != null) {
+    if (weather != null && cardStyle == CourseCardStyle.weather) {
       weatherLayer = WeatherCardLayer(
         kind: weatherPresentation(weather!.weatherCode).kind,
         reduceMotion: reduceMotion,
@@ -1188,9 +1272,21 @@ class _CourseCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (weatherLayer != null) IgnorePointer(child: weatherLayer),
+              if (active &&
+                  cardStyle != CourseCardStyle.weather &&
+                  cardStyle != CourseCardStyle.none)
+                IgnorePointer(
+                  child: _CardEffectLayer(
+                    style: cardStyle,
+                    color: cardColor,
+                    reduceMotion: reduceMotion,
+                  ),
+                ),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxHeight <= 118;
+                  final minimal = density == YsScheduleDensity.minimal;
+                  final rich = density == YsScheduleDensity.rich;
                   return Padding(
                     padding: EdgeInsets.fromLTRB(
                       5,
@@ -1234,19 +1330,25 @@ class _CourseCard extends StatelessWidget {
                             children: [
                               Text(
                                 course.name,
-                                maxLines: compact ? 2 : (span == 1 ? 2 : 3),
+                                maxLines: minimal
+                                    ? 2
+                                    : (compact ? 2 : (span == 1 ? 2 : 3)),
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   height: compact
                                       ? 1.12
                                       : (span == 1 ? 1.15 : 1.22),
-                                  fontSize: compact ? 9 : (span == 1 ? 10 : 12),
+                                  fontSize: minimal
+                                      ? 9
+                                      : (compact ? 9 : (span == 1 ? 10 : 12)),
                                   fontWeight: FontWeight.w800,
                                   color: foreground,
                                 ),
                               ),
-                              if (span > 1 && course.room.isNotEmpty) ...[
+                              if (!minimal &&
+                                  span > 1 &&
+                                  course.room.isNotEmpty) ...[
                                 const SizedBox(height: 3),
                                 Text(
                                   '@${course.room}',
@@ -1260,22 +1362,36 @@ class _CourseCard extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                              if (rich && course.teacher.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  course.teacher,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    color: foreground.withValues(alpha: 0.76),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
-                        Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Text(
-                            '(${course.startWeek}-${course.endWeek}周)',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: compact || span == 1 ? 7 : 8,
-                              color: foreground.withValues(alpha: 0.88),
+                        if (!minimal)
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Text(
+                              '(${course.startWeek}-${course.endWeek}周)',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: compact || span == 1 ? 7 : 8,
+                                color: foreground.withValues(alpha: 0.88),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   );
@@ -1284,6 +1400,131 @@ class _CourseCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CardEffectLayer extends StatefulWidget {
+  const _CardEffectLayer({
+    required this.style,
+    required this.color,
+    required this.reduceMotion,
+  });
+
+  final CourseCardStyle style;
+  final Color color;
+  final bool reduceMotion;
+
+  @override
+  State<_CardEffectLayer> createState() => _CardEffectLayerState();
+}
+
+class _CardEffectLayerState extends State<_CardEffectLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.reduceMotion) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CardEffectLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.reduceMotion) {
+      _controller
+        ..stop()
+        ..value = 0.42;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final progress = widget.reduceMotion ? 0.42 : _controller.value;
+          return switch (widget.style) {
+            CourseCardStyle.shimmer => LayoutBuilder(
+              builder: (context, constraints) => Transform.translate(
+                offset: Offset((progress * 2 - 0.6) * constraints.maxWidth, 0),
+                child: Transform.rotate(
+                  angle: -0.16,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.32,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0),
+                            Colors.white.withValues(alpha: 0.18),
+                            Colors.white.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            CourseCardStyle.glow => Align(
+              alignment: Alignment.topRight,
+              child: Transform.scale(
+                scale: 0.92 + math.sin(progress * math.pi * 2) * 0.08,
+                child: FractionallySizedBox(
+                  widthFactor: 0.88,
+                  heightFactor: 0.58,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(0.65, -0.7),
+                        colors: [
+                          Colors.white.withValues(alpha: 0.24),
+                          Colors.white.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            CourseCardStyle.aurora => DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment(-1 + progress * 0.8, -1),
+                  end: Alignment(1 - progress * 0.8, 1),
+                  colors: [
+                    Colors.white.withValues(alpha: 0.04),
+                    const Color(0xFF8DE7D1).withValues(alpha: 0.18),
+                    const Color(0xFFFFC573).withValues(alpha: 0.11),
+                    Colors.white.withValues(alpha: 0.03),
+                  ],
+                ),
+              ),
+            ),
+            CourseCardStyle.breathe => ColoredBox(
+              color: Colors.white.withValues(
+                alpha: 0.035 + (math.sin(progress * math.pi * 2) + 1) * 0.035,
+              ),
+            ),
+            CourseCardStyle.weather ||
+            CourseCardStyle.none => const SizedBox.shrink(),
+          };
+        },
       ),
     );
   }

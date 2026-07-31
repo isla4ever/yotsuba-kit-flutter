@@ -3,13 +3,24 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 
-const _todayLayoutKey = 'today.dashboard.layout.v3';
+const _todayLayoutKey = 'today.dashboard.layout.v4';
 const _legacyTodayLayoutKeys = [
+  'today.dashboard.layout.v3',
   'today.dashboard.layout.v2',
   'today.dashboard.layout.v1',
 ];
 
-enum TodayTileId { command, timeline, tasks, courseWork, materials }
+enum TodayTileId {
+  command,
+  weather,
+  timeline,
+  readiness,
+  tasks,
+  courseWork,
+  weekGlance,
+  studyLoad,
+  materials,
+}
 
 enum TodayTileSize {
   oneByOne(1, 1, '1x1'),
@@ -69,11 +80,19 @@ class TodayTileConfig {
 }
 
 const defaultTodayLayout = <TodayTileConfig>[
-  TodayTileConfig(id: TodayTileId.command, size: TodayTileSize.twoByTwo),
-  TodayTileConfig(id: TodayTileId.tasks, size: TodayTileSize.oneByOne),
+  TodayTileConfig(id: TodayTileId.command, size: TodayTileSize.twoByOne),
+  TodayTileConfig(id: TodayTileId.weather, size: TodayTileSize.twoByTwo),
+  TodayTileConfig(id: TodayTileId.timeline, size: TodayTileSize.twoByOne),
+  TodayTileConfig(id: TodayTileId.readiness, size: TodayTileSize.oneByOne),
   TodayTileConfig(id: TodayTileId.courseWork, size: TodayTileSize.oneByOne),
-  TodayTileConfig(id: TodayTileId.timeline, size: TodayTileSize.twoByTwo),
-  TodayTileConfig(id: TodayTileId.materials, size: TodayTileSize.twoByOne),
+  TodayTileConfig(id: TodayTileId.tasks, size: TodayTileSize.oneByOne),
+  TodayTileConfig(id: TodayTileId.weekGlance, size: TodayTileSize.oneByOne),
+  TodayTileConfig(id: TodayTileId.studyLoad, size: TodayTileSize.twoByOne),
+  TodayTileConfig(
+    id: TodayTileId.materials,
+    size: TodayTileSize.twoByOne,
+    visible: false,
+  ),
 ];
 
 final todayLayoutProvider =

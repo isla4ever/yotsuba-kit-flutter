@@ -12,12 +12,37 @@ import 'package:yotsuba_schedule/data/weather/weather_repository.dart';
 import 'package:yotsuba_schedule/domain/models/course.dart';
 import 'package:yotsuba_schedule/domain/models/course_plan.dart';
 import 'package:yotsuba_schedule/domain/models/day_task.dart';
+import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/today/application/today_layout_controller.dart';
 import 'package:yotsuba_schedule/features/today/application/today_view_model.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_command_summary.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_course_timeline.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_dashboard_grid.dart';
+import 'package:yotsuba_schedule/features/today/presentation/widgets/today_demo_panels.dart';
 import 'package:yotsuba_schedule/features/today/presentation/widgets/today_readiness_board.dart';
+import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
+
+class _FakeWeatherLocation implements WeatherLocationGateway {
+  const _FakeWeatherLocation();
+
+  @override
+  Future<WeatherLocationPermission> checkPermission() async =>
+      WeatherLocationPermission.allowed;
+
+  @override
+  Future<WeatherCoordinates?> currentCoordinates() async =>
+      const WeatherCoordinates(latitude: 31.23, longitude: 121.47);
+
+  @override
+  Future<bool> isServiceEnabled() async => true;
+
+  @override
+  Future<bool> openSettings({required bool locationService}) async => true;
+
+  @override
+  Future<WeatherLocationPermission> requestPermission() async =>
+      WeatherLocationPermission.allowed;
+}
 
 void main() {
   test(
@@ -46,7 +71,7 @@ void main() {
       expect(layout.first.size, TodayTileSize.twoByTwo);
       expect(layout[1].size, TodayTileSize.twoByTwo);
       expect(layout[2].size, TodayTileSize.twoByTwo);
-      expect(preferences.getString('today.dashboard.layout.v3'), isNotNull);
+      expect(preferences.getString('today.dashboard.layout.v4'), isNotNull);
     },
   );
 
@@ -77,6 +102,10 @@ void main() {
       TodayTileId.timeline,
       TodayTileId.tasks,
       TodayTileId.courseWork,
+      TodayTileId.weather,
+      TodayTileId.readiness,
+      TodayTileId.weekGlance,
+      TodayTileId.studyLoad,
     ]);
   });
 
@@ -122,6 +151,65 @@ void main() {
       71,
     );
   });
+
+  test(
+    'authorized device weather replaces the first-launch simulation',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['latitude'], '31.23');
+        expect(request.url.queryParameters['longitude'], '121.47');
+        return http.Response(
+          jsonEncode({
+            'latitude': 31.23,
+            'longitude': 121.47,
+            'timezone': 'Asia/Shanghai',
+            'current': {'temperature_2m': 19.0, 'weather_code': 63},
+            'daily': {
+              'time': ['2026-07-31'],
+              'weather_code': [63],
+              'temperature_2m_max': [21.0],
+              'temperature_2m_min': [17.0],
+              'precipitation_probability_max': [76],
+            },
+            'hourly': {
+              'time': ['2026-07-31T08:00'],
+              'weather_code': [63],
+              'temperature_2m': [18.0],
+            },
+          }),
+          200,
+        );
+      });
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          weatherLocationGatewayProvider.overrideWithValue(
+            const _FakeWeatherLocation(),
+          ),
+          weatherRepositoryProvider.overrideWithValue(
+            WeatherRepository(httpClient: client),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(weatherControllerProvider).demoMode, isTrue);
+      expect(
+        await container
+            .read(weatherControllerProvider.notifier)
+            .requestLocation(),
+        WeatherStatus.ready,
+      );
+      final current = container.read(weatherControllerProvider);
+      expect(current.demoMode, isFalse);
+      expect(current.campusFallback, isFalse);
+      expect(current.snapshot?.currentWeatherCode, 63);
+      expect(current.snapshot?.latitude, 31.23);
+      expect(preferences.getString('weather.source.v1'), 'device');
+    },
+  );
 
   testWidgets('dashboard widgets fit every supported tile size at 320px', (
     tester,
@@ -183,10 +271,33 @@ void main() {
       remainingMinutes: 90,
       gapSuggestion: '提前准备课程资料',
     );
+    final weather = WeatherState(
+      status: WeatherStatus.ready,
+      demoMode: true,
+      snapshot: WeatherSnapshot(
+        latitude: 34.6,
+        longitude: 119.2,
+        timezone: 'Asia/Shanghai',
+        currentTemperature: 26,
+        currentWeatherCode: 2,
+        fetchedAt: DateTime(2026, 7, 26),
+        daily: const [
+          DailyWeather(
+            dateKey: '2026-07-26',
+            weatherCode: 2,
+            temperatureMax: 30,
+            temperatureMin: 23,
+            precipitationProbability: 22,
+          ),
+        ],
+      ),
+    );
 
     Future<void> pumpTile(TodayTileSize size, Widget child) async {
-      final width = size.columns == 1 ? 142.0 : 296.0;
-      final height = size.rows == 1 ? 152.0 : 316.0;
+      // Mirrors TodayDashboardGrid at the supported 320px viewport:
+      // 10px page gutters, 10px column gap and 112px rows.
+      final width = size.columns == 1 ? 145.0 : 300.0;
+      final height = size.rows == 1 ? 112.0 : 234.0;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
@@ -199,7 +310,11 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(tester.takeException(), isNull);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: '${child.runtimeType} must fit $size',
+      );
     }
 
     for (final size in TodayTileSize.values) {
@@ -250,6 +365,25 @@ void main() {
           onEmptyTap: () {},
         ),
       );
+      await pumpTile(
+        size,
+        TodayWeatherPanel(
+          size: size,
+          weather: weather,
+          date: viewModel.now,
+          reduceMotion: true,
+          onTap: () {},
+        ),
+      );
+      await pumpTile(
+        size,
+        TodayReadinessPanel(size: size, viewModel: viewModel),
+      );
+      await pumpTile(
+        size,
+        TodayWeekGlancePanel(size: size, courses: courses, week: 2),
+      );
+      await pumpTile(size, TodayStudyLoadPanel(size: size));
     }
   });
 

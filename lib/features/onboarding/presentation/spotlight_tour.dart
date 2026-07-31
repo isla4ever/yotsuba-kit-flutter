@@ -37,13 +37,45 @@ class _SpotlightTourState extends State<SpotlightTour> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusTarget());
   }
 
   @override
   void didUpdateWidget(covariant SpotlightTour oldWidget) {
     super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusTarget());
+  }
+
+  Future<void> _focusTarget() async {
+    if (!mounted || widget.steps.isEmpty) return;
+    final measuredIndex = _index;
+    final targetContext = widget.steps[measuredIndex].target.currentContext;
+    if (targetContext != null && !_isVisible(targetContext)) {
+      await Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.3,
+        duration: widget.reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+      );
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    if (!mounted || measuredIndex != _index) return;
+    _measure();
+  }
+
+  bool _isVisible(BuildContext targetContext) {
+    final target = targetContext.findRenderObject();
+    final overlay = _overlayKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlay is! RenderBox || !target.hasSize) {
+      return true;
+    }
+    final global = target.localToGlobal(Offset.zero);
+    final origin = overlay.localToGlobal(Offset.zero);
+    final top = global.dy - origin.dy;
+    final bottom = top + target.size.height;
+    return top >= 10 && bottom <= overlay.size.height - 10;
   }
 
   void _measure() {
@@ -134,14 +166,14 @@ class _SpotlightTourState extends State<SpotlightTour> {
     setState(() {
       _index++;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusTarget());
   }
 
   void _back() {
     setState(() {
       _index--;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusTarget());
   }
 }
 

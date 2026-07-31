@@ -35,8 +35,8 @@ class TodayDashboardGrid extends StatefulWidget {
 }
 
 class _TodayDashboardGridState extends State<TodayDashboardGrid> {
-  static const _gap = 12.0;
-  static const _rowHeight = 152.0;
+  static const _gap = 10.0;
+  static const _rowHeight = 112.0;
 
   List<TodayTileId>? _previewOrder;
   final Map<TodayTileId, TodayTileSize> _previewSizes = {};
@@ -936,9 +936,13 @@ class _EditBadge extends StatelessWidget {
 
 String _tileName(TodayTileId id) => switch (id) {
   TodayTileId.command => '课程概览',
+  TodayTileId.weather => '天气',
   TodayTileId.timeline => '课程时间轴',
+  TodayTileId.readiness => '出发准备',
   TodayTileId.tasks => '当天待办',
   TodayTileId.courseWork => '课程作业',
+  TodayTileId.weekGlance => '本周一览',
+  TodayTileId.studyLoad => '学习投入',
   TodayTileId.materials => '携带物品',
 };
 

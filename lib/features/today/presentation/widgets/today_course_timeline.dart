@@ -32,6 +32,39 @@ class TodayCourseTimeline extends StatelessWidget {
     final compact = size == TodayTileSize.oneByOne;
     final horizontal = size == TodayTileSize.twoByOne;
 
+    if (horizontal) {
+      return TodayPanel(
+        padding: const EdgeInsets.all(12),
+        child: InkWell(
+          onTap: onOpenSchedule,
+          borderRadius: BorderRadius.circular(7),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '今日课程 · ${courses.length} 节',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: context.palette.textFaint,
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  for (var index = 0; index < visible.length; index++) ...[
+                    Expanded(child: _CompactCourse(item: visible[index])),
+                    if (index != visible.length - 1) const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      );
+    }
+
     return TodayPanel(
       padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
@@ -77,6 +110,47 @@ class TodayCourseTimeline extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CompactCourse extends StatelessWidget {
+  const _CompactCourse({required this.item});
+
+  final TodayCourse item;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final seed = item.course.name.codeUnits.fold<int>(
+      0,
+      (value, unit) => (value * 31 + unit) & 0x7fffffff,
+    );
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: palette.courseColors[seed % palette.courseColors.length],
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          item.timeLabel.substring(0, 5),
+          style: TextStyle(fontSize: 11, color: palette.textFaint),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            item.course.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: palette.text),
+          ),
+        ),
+      ],
     );
   }
 }

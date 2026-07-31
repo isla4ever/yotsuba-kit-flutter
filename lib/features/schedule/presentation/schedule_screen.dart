@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/theme/app_motion.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
@@ -17,9 +17,14 @@ import 'package:yotsuba_schedule/features/schedule/presentation/widgets/course_m
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/data_management_sheet.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/day_planner_sheet.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/schedule_action_dock.dart';
+import 'package:yotsuba_schedule/features/schedule/presentation/widgets/schedule_agenda.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/schedule_header.dart';
+import 'package:yotsuba_schedule/features/schedule/presentation/widgets/schedule_toolbar.dart';
 import 'package:yotsuba_schedule/features/schedule/presentation/widgets/week_timetable.dart';
+import 'package:yotsuba_schedule/features/settings/presentation/settings_screen.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
+import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart'
+    show YsHeaderStyle;
 
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
@@ -56,6 +61,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final settings = ref.watch(appSettingsProvider);
     final weather = ref.watch(weatherControllerProvider);
     final controller = ref.read(scheduleControllerProvider.notifier);
+    final settingsController = ref.read(appSettingsProvider.notifier);
     final onboarding = ref.watch(scheduleOnboardingProvider);
     final start = ScheduleEngine.weekStart(
       schedule.termStart,
@@ -71,18 +77,48 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           Column(
             key: _screenGuideKey,
             children: [
-              ScheduleHeader(
-                week: schedule.currentWeek,
-                dateRange: range,
-                weather: weather,
-                reduceMotion: settings.reduceMotion,
-                onSelectWeek: () => _showWeekPicker(schedule, controller),
-                onWeather: _requestWeather,
-                onManage: () => showDataManagementSheet(context),
-                weekGuideKey: _weekGuideKey,
-                weatherGuideKey: _weatherGuideKey,
-                dataGuideKey: _dataGuideKey,
+              if (settings.showHeader)
+                ScheduleHeader(
+                  week: schedule.currentWeek,
+                  dateRange: range,
+                  weather: weather,
+                  reduceMotion: settings.reduceMotion,
+                  onSelectWeek: () => _showWeekPicker(schedule, controller),
+                  onWeather: _requestWeather,
+                  onManage: () => showDataManagementSheet(context),
+                  style: settings.scheduleHeaderStyle,
+                  showWeather: settings.showWeather,
+                  showActions: settings.showHeaderActions,
+                  weatherGuideKey: _weatherGuideKey,
+                  dataGuideKey: _dataGuideKey,
+                ),
+              ScheduleToolbar(
+                layout: settings.scheduleLayout,
+                transition: settings.scheduleTransition,
+                headerStyle: settings.scheduleHeaderStyle,
+                editing: _editing,
+                onLayoutChanged: (value) {
+                  if (value == ScheduleLayoutMode.agenda && _editing) {
+                    setState(() => _editing = false);
+                  }
+                  settingsController.setScheduleLayout(value);
+                },
+                onTransitionChanged: settingsController.setScheduleTransition,
+                onCycleHeader: settingsController.cycleScheduleHeaderStyle,
+                onGuide: () =>
+                    ref.read(scheduleOnboardingProvider.notifier).replay(),
+                onToggleEdit: () => setState(() => _editing = !_editing),
               ),
+              if (settings.scheduleHeaderStyle != YsHeaderStyle.none)
+                KeyedSubtree(
+                  key: _weekGuideKey,
+                  child: _ScheduleWeekBar(
+                    week: schedule.currentWeek,
+                    dateRange: range,
+                    style: settings.scheduleHeaderStyle,
+                    onTap: () => _showWeekPicker(schedule, controller),
+                  ),
+                ),
               Expanded(
                 child: AnimatedContainer(
                   duration: settings.reduceMotion
@@ -91,40 +127,84 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                   color: _editing
                       ? context.palette.canvas.withValues(alpha: 0.96)
                       : Colors.transparent,
-                  child: WeekTimetable(
-                    termStart: schedule.termStart,
-                    week: schedule.currentWeek,
-                    courses: schedule.courses,
-                    dayOverrides: schedule.dayOverrides,
-                    weather: weather.snapshot,
-                    visibleDays: settings.showWeekend ? 7 : 5,
-                    rowHeight: settings.scheduleRowHeight,
-                    courseTimes: settings.summerSchedule
-                        ? summerCourseTimes
-                        : standardCourseTimes,
-                    editing: _editing,
-                    reduceMotion: settings.reduceMotion,
-                    onSwipeWeek: (direction) =>
-                        controller.setWeek(schedule.currentWeek + direction),
-                    onCourseTap: (course) =>
-                        _showCourse(course, schedule.currentWeek),
-                    onDayTap: (weekday) => showDayPlannerSheet(
-                      context,
-                      date: ScheduleEngine.dateForWeekday(
-                        schedule.termStart,
-                        schedule.currentWeek,
-                        weekday,
+                  child: AnimatedSwitcher(
+                    duration: settings.reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(
+                        scale: Tween<double>(begin: 0.992, end: 1).animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutCubic,
+                          ),
+                        ),
+                        child: child,
                       ),
                     ),
-                    onEmptyCellTap: (weekday, start, end) => _addCourse(
-                      controller,
-                      schedule,
-                      weekday: weekday,
-                      section: start,
-                      endSection: end,
-                    ),
-                    dayGuideKey: _dayGuideKey,
-                    courseGuideKey: _courseGuideKey,
+                    child: settings.scheduleLayout == ScheduleLayoutMode.grid
+                        ? WeekTimetable(
+                            key: const ValueKey('schedule-grid'),
+                            termStart: schedule.termStart,
+                            week: schedule.currentWeek,
+                            courses: schedule.courses,
+                            dayOverrides: schedule.dayOverrides,
+                            weather: weather.snapshot,
+                            visibleDays: settings.visibleDays,
+                            rowHeight: settings.scheduleRowHeight,
+                            courseTimes: settings.summerSchedule
+                                ? summerCourseTimes
+                                : standardCourseTimes,
+                            editing: _editing,
+                            reduceMotion: settings.reduceMotion,
+                            showWeekdayBar: settings.showWeekdayBar,
+                            density: settings.scheduleDensity,
+                            transition: settings.scheduleTransition,
+                            cardStyle: settings.courseCardStyle,
+                            onSwipeWeek: (direction) => controller.setWeek(
+                              schedule.currentWeek + direction,
+                            ),
+                            onCourseTap: (course) =>
+                                _showCourse(course, schedule.currentWeek),
+                            onDayTap: (weekday) => showDayPlannerSheet(
+                              context,
+                              date: ScheduleEngine.dateForWeekday(
+                                schedule.termStart,
+                                schedule.currentWeek,
+                                weekday,
+                              ),
+                            ),
+                            onEmptyCellTap: (weekday, start, end) => _addCourse(
+                              controller,
+                              schedule,
+                              weekday: weekday,
+                              section: start,
+                              endSection: end,
+                            ),
+                            dayGuideKey: _dayGuideKey,
+                            courseGuideKey: _courseGuideKey,
+                          )
+                        : ScheduleAgenda(
+                            key: const ValueKey('schedule-agenda'),
+                            termStart: schedule.termStart,
+                            week: schedule.currentWeek,
+                            visibleDays: settings.visibleDays,
+                            courses: schedule.courses,
+                            dayOverrides: schedule.dayOverrides,
+                            onCourseTap: (course) =>
+                                _showCourse(course, schedule.currentWeek),
+                            onDayTap: (weekday) => showDayPlannerSheet(
+                              context,
+                              date: ScheduleEngine.dateForWeekday(
+                                schedule.termStart,
+                                schedule.currentWeek,
+                                weekday,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -144,7 +224,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               }),
               onOpenSettings: () {
                 setState(() => _toolMenuOpen = false);
-                context.go('/settings');
+                showDemoSettingsSheet(context, ref);
               },
               onReplayGuide: () {
                 setState(() => _toolMenuOpen = false);
@@ -266,9 +346,25 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           .where((plan) => plan.courseId == original.id)
           .toList(),
       weather: weather,
+      hero: settings.detailHero,
+      layout: settings.detailLayout,
+      showActions: settings.detailActions,
+      placement: settings.sheetPlacement,
+      glass: settings.sheetGlass,
+      reduceMotion: settings.reduceMotion,
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case CourseDetailAction.share:
+        await SharePlus.instance.share(
+          ShareParams(
+            subject: original.name,
+            text:
+                '${original.name} · 周${original.weekday} '
+                '第${original.startSection}-${original.endSection}节'
+                '${original.room.isEmpty ? '' : ' · ${original.room}'}',
+          ),
+        );
       case CourseDetailAction.edit:
         final edited = await showCourseFormSheet(
           context,
@@ -399,5 +495,94 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     );
     if (selected == null || !mounted) return;
     controller.setWeek(selected);
+  }
+}
+
+class _ScheduleWeekBar extends StatelessWidget {
+  const _ScheduleWeekBar({
+    required this.week,
+    required this.dateRange,
+    required this.style,
+    required this.onTap,
+  });
+
+  final int week;
+  final String dateRange;
+  final YsHeaderStyle style;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final height = switch (style) {
+      YsHeaderStyle.compact => 38.0,
+      YsHeaderStyle.standard => 46.0,
+      YsHeaderStyle.expanded => 58.0,
+      YsHeaderStyle.none => 0.0,
+    };
+    return Container(
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: palette.surface.withValues(alpha: 0.76),
+        border: Border(bottom: BorderSide(color: palette.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '本学期课表',
+                  style: TextStyle(
+                    fontSize: style == YsHeaderStyle.expanded ? 12 : 10,
+                    fontWeight: FontWeight.w700,
+                    color: palette.textSoft,
+                  ),
+                ),
+                if (style == YsHeaderStyle.expanded)
+                  Text(
+                    dateRange,
+                    style: TextStyle(fontSize: 9, color: palette.textFaint),
+                  ),
+              ],
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: '选择教学周，当前第 $week 周',
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '第 $week 周',
+                      style: TextStyle(
+                        fontSize: style == YsHeaderStyle.expanded ? 24 : 20,
+                        height: 1,
+                        fontWeight: FontWeight.w800,
+                        color: palette.text,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: palette.textSoft,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

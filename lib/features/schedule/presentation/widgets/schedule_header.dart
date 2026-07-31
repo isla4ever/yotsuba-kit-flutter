@@ -3,6 +3,7 @@ import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_glyph.dart';
+import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart';
 
 class ScheduleHeader extends StatelessWidget {
   const ScheduleHeader({
@@ -13,6 +14,9 @@ class ScheduleHeader extends StatelessWidget {
     required this.onSelectWeek,
     required this.onWeather,
     required this.onManage,
+    this.style = YsHeaderStyle.standard,
+    this.showWeather = true,
+    this.showActions = true,
     this.weekGuideKey,
     this.weatherGuideKey,
     this.dataGuideKey,
@@ -26,6 +30,9 @@ class ScheduleHeader extends StatelessWidget {
   final VoidCallback onSelectWeek;
   final VoidCallback onWeather;
   final VoidCallback onManage;
+  final YsHeaderStyle style;
+  final bool showWeather;
+  final bool showActions;
   final GlobalKey? weekGuideKey;
   final GlobalKey? weatherGuideKey;
   final GlobalKey? dataGuideKey;
@@ -37,15 +44,11 @@ class ScheduleHeader extends StatelessWidget {
     final presentation = snapshot == null
         ? null
         : weatherPresentation(snapshot.currentWeatherCode);
-    final compact = MediaQuery.sizeOf(context).width < 360;
     return Container(
-      height: 104,
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 12 : 18,
-        vertical: 13,
-      ),
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: palette.surface.withValues(alpha: 0.88),
+        color: palette.surface.withValues(alpha: 0.82),
         border: Border(bottom: BorderSide(color: palette.border)),
       ),
       child: Row(
@@ -55,106 +58,113 @@ class ScheduleHeader extends StatelessWidget {
               key: weekGuideKey,
               child: InkWell(
                 onTap: onSelectWeek,
-                borderRadius: BorderRadius.circular(8),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                borderRadius: BorderRadius.circular(6),
+                child: Row(
                   children: [
-                    Text(
-                      '本周课表 · $dateRange',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: palette.textSoft,
+                    Container(
+                      width: 8,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: palette.scheduleAccent,
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Text(
-                          '第 $week 周',
-                          style: TextStyle(
-                            height: 1,
-                            fontSize: compact ? 30 : 34,
-                            fontWeight: FontWeight.w800,
-                            color: palette.text,
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Yotsuba 课表',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: palette.text,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 3),
-                        Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 23,
-                          color: palette.textSoft,
-                        ),
-                      ],
+                          const SizedBox(height: 1),
+                          Text(
+                            '第 $week 周 · 2026 秋季学期',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: palette.textFaint,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-          KeyedSubtree(
-            key: weatherGuideKey,
-            child: _HeaderButton(
-              compact: compact,
-              label: snapshot == null
-                  ? '获取当前位置天气'
-                  : '${presentation!.label} ${snapshot.currentTemperature.round()}度',
-              onTap: onWeather,
-              child: AnimatedSwitcher(
-                duration: reduceMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 240),
-                child: weather.status == WeatherStatus.loading
-                    ? SizedBox(
-                        key: const ValueKey('weather-loading'),
-                        width: 17,
-                        height: 17,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.8,
-                          color: palette.scheduleAccent,
-                        ),
-                      )
-                    : Row(
-                        key: ValueKey(presentation?.kind),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          WeatherGlyph(
-                            kind: presentation?.kind ?? WeatherKind.neutral,
-                            size: 18,
-                            animate: !reduceMotion && snapshot != null,
-                            color: palette.textSoft,
+          if (showWeather)
+            KeyedSubtree(
+              key: weatherGuideKey,
+              child: _HeaderButton(
+                label: snapshot == null
+                    ? '获取当前位置天气'
+                    : '${presentation!.label} ${snapshot.currentTemperature.round()}度',
+                onTap: onWeather,
+                child: AnimatedSwitcher(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 240),
+                  child: weather.status == WeatherStatus.loading
+                      ? SizedBox(
+                          key: const ValueKey('weather-loading'),
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.8,
+                            color: palette.scheduleAccent,
                           ),
-                          if (snapshot != null) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '${snapshot.currentTemperature.round()}°',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: palette.text,
-                              ),
+                        )
+                      : Row(
+                          key: ValueKey(presentation?.kind),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            WeatherGlyph(
+                              kind: presentation?.kind ?? WeatherKind.neutral,
+                              size: 18,
+                              animate: !reduceMotion && snapshot != null,
+                              color: palette.textSoft,
                             ),
+                            if (snapshot != null) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                '${snapshot.currentTemperature.round()}°',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: palette.text,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
+                        ),
+                ),
               ),
             ),
-          ),
-          SizedBox(width: compact ? 6 : 10),
-          KeyedSubtree(
-            key: dataGuideKey,
-            child: _HeaderButton(
-              compact: compact,
-              label: '打开本地数据管理',
-              onTap: onManage,
-              child: Icon(
-                Icons.folder_open_outlined,
-                size: 20,
-                color: palette.textSoft,
+          if (showWeather && showActions) const SizedBox(width: 7),
+          if (showActions)
+            KeyedSubtree(
+              key: dataGuideKey,
+              child: _HeaderButton(
+                label: '日历与数据',
+                onTap: onManage,
+                child: Icon(
+                  Icons.calendar_month_outlined,
+                  size: 19,
+                  color: palette.textSoft,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -166,13 +176,11 @@ class _HeaderButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     required this.child,
-    required this.compact,
   });
 
   final String label;
   final VoidCallback onTap;
   final Widget child;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -184,9 +192,9 @@ class _HeaderButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: BoxConstraints(minWidth: compact ? 42 : 48),
-          height: compact ? 46 : 50,
-          padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
+          constraints: const BoxConstraints(minWidth: 36),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
           decoration: BoxDecoration(
             color: palette.surfaceRaised.withValues(alpha: 0.9),
             border: Border.all(color: palette.border),

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yotsuba_schedule/core/settings/app_settings.dart';
 import 'package:yotsuba_schedule/core/utils/schedule_engine.dart';
@@ -61,11 +59,7 @@ class TodayViewModel {
 }
 
 final clockProvider = StreamProvider<DateTime>((ref) async* {
-  yield DateTime.now();
-  yield* Stream<DateTime>.periodic(
-    const Duration(seconds: 30),
-    (_) => DateTime.now(),
-  );
+  yield DateTime(2026, 7, 27, 7, 35);
 });
 
 final todayViewModelProvider = Provider<TodayViewModel>((ref) {

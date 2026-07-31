@@ -20,7 +20,7 @@ class TodayCommandSummary extends StatelessWidget {
     final lead = viewModel.lead;
     final state = switch (lead?.status) {
       TodayCourseStatus.ongoing => '进行中',
-      TodayCourseStatus.upcoming => '下一节',
+      TodayCourseStatus.upcoming => '下一节课',
       _ => '已完成',
     };
     final nowMinutes = viewModel.now.hour * 60 + viewModel.now.minute;
@@ -39,26 +39,97 @@ class TodayCommandSummary extends StatelessWidget {
     final progress = (viewModel.progress * 100).round().clamp(0, 100);
 
     if (size.rows == 1) {
+      final palette = context.palette;
+      final colorSeed = title.codeUnits.fold<int>(
+        0,
+        (value, unit) => (value * 31 + unit) & 0x7fffffff,
+      );
+      final courseColor =
+          palette.courseColors[colorSeed % palette.courseColors.length];
       return _CommandCard(
-        padding: EdgeInsets.all(size.columns == 1 ? 10 : 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _LeadBlock(
-                state: state,
-                status: lead?.status,
-                title: title,
-                detail: detail,
-                countdown: countdown,
-                compact: true,
-                showDetail: size.columns == 2,
+            Text(
+              state,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: palette.textFaint,
               ),
             ),
-            SizedBox(width: size.columns == 1 ? 7 : 14),
-            _ProgressRing(
-              progress: progress,
-              size: size.columns == 1 ? 52 : 62,
+            const SizedBox(height: 6),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: courseColor,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(
+                        right: size.columns == 2 ? 72 : 0,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (size.columns == 2)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            countdown,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -66,8 +137,11 @@ class TodayCommandSummary extends StatelessWidget {
     }
 
     if (size.columns == 1) {
+      final cardPadding = size.rows == 2
+          ? const EdgeInsets.all(10)
+          : const EdgeInsets.all(12);
       return _CommandCard(
-        padding: const EdgeInsets.all(12),
+        padding: cardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -75,7 +149,7 @@ class TodayCommandSummary extends StatelessWidget {
               children: [
                 _StateBadge(state: state, status: lead?.status),
                 const Spacer(),
-                _ProgressRing(progress: progress, size: 56),
+                _ProgressRing(progress: progress, size: 48),
               ],
             ),
             const SizedBox(height: 8),
@@ -118,7 +192,7 @@ class TodayCommandSummary extends StatelessWidget {
     }
 
     return _CommandCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       child: Column(
         children: [
           Row(
@@ -131,19 +205,19 @@ class TodayCommandSummary extends StatelessWidget {
                   title: title,
                   detail: detail,
                   countdown: countdown,
-                  compact: false,
+                  compact: true,
                   showDetail: true,
                 ),
               ),
-              const SizedBox(width: 14),
-              _ProgressRing(progress: progress, size: 84),
+              const SizedBox(width: 12),
+              _ProgressRing(progress: progress, size: 68),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Divider(height: 1, color: context.palette.border),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           _Metrics(viewModel: viewModel),
-          const SizedBox(height: 13),
+          const SizedBox(height: 8),
           _WeatherHint(text: weatherHint),
         ],
       ),

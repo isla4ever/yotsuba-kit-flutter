@@ -6,6 +6,7 @@ import 'package:yotsuba_schedule/core/theme/app_palette.dart';
 import 'package:yotsuba_schedule/domain/models/weather.dart';
 import 'package:yotsuba_schedule/features/announcements/application/local_announcement_controller.dart';
 import 'package:yotsuba_schedule/features/announcements/presentation/local_announcement_dialog.dart';
+import 'package:yotsuba_schedule/features/settings/presentation/settings_screen.dart';
 import 'package:yotsuba_schedule/features/weather/application/weather_controller.dart';
 import 'package:yotsuba_schedule/features/weather/presentation/weather_scene.dart';
 
@@ -24,6 +25,7 @@ class _AppShellState extends ConsumerState<AppShell>
   late int _lastIndex;
   var _direction = 1.0;
   var _announcementShown = false;
+  var _settingsOpen = false;
 
   @override
   void initState() {
@@ -70,6 +72,13 @@ class _AppShellState extends ConsumerState<AppShell>
     super.dispose();
   }
 
+  Future<void> _openSettings() async {
+    if (_settingsOpen) return;
+    setState(() => _settingsOpen = true);
+    await showDemoSettingsSheet(context, ref);
+    if (mounted) setState(() => _settingsOpen = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
@@ -82,38 +91,52 @@ class _AppShellState extends ConsumerState<AppShell>
       parent: _controller,
       curve: Curves.easeOutQuart,
     );
-    return WeatherScene(
-      kind: sceneKind,
-      reduceMotion: reduceMotion,
-      intensity: 0.82,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: reduceMotion
-            ? widget.navigationShell
-            : FadeTransition(
-                opacity: Tween<double>(begin: 0.9, end: 1).animate(animation),
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: Offset(0.007 * _direction, 0.003),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: ScaleTransition(
-                    scale: Tween<double>(
-                      begin: 0.999,
-                      end: 1,
-                    ).animate(animation),
-                    child: widget.navigationShell,
-                  ),
+    final scaffold = Scaffold(
+      backgroundColor: Colors.transparent,
+      body: reduceMotion
+          ? widget.navigationShell
+          : FadeTransition(
+              opacity: Tween<double>(begin: 0.9, end: 1).animate(animation),
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: Offset(0.007 * _direction, 0.003),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.999, end: 1).animate(animation),
+                  child: widget.navigationShell,
                 ),
               ),
-        bottomNavigationBar: _AppTabBar(
-          selectedIndex: widget.navigationShell.currentIndex,
-          onSelected: (index) {
-            widget.navigationShell.goBranch(
-              index,
-              initialLocation: index == widget.navigationShell.currentIndex,
-            );
-          },
+            ),
+      bottomNavigationBar: _AppTabBar(
+        selectedIndex: _settingsOpen ? 2 : widget.navigationShell.currentIndex,
+        showLabels: settings.showDockLabels,
+        onSelected: (index) {
+          if (index == 2) {
+            _openSettings();
+            return;
+          }
+          widget.navigationShell.goBranch(
+            index,
+            initialLocation: index == widget.navigationShell.currentIndex,
+          );
+        },
+      ),
+    );
+    final scene = settings.weatherScene
+        ? WeatherScene(
+            kind: sceneKind,
+            reduceMotion: reduceMotion,
+            intensity: 0.82,
+            child: scaffold,
+          )
+        : scaffold;
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: ClipRect(child: scene),
         ),
       ),
     );
@@ -121,9 +144,14 @@ class _AppShellState extends ConsumerState<AppShell>
 }
 
 class _AppTabBar extends StatelessWidget {
-  const _AppTabBar({required this.selectedIndex, required this.onSelected});
+  const _AppTabBar({
+    required this.selectedIndex,
+    required this.showLabels,
+    required this.onSelected,
+  });
 
   final int selectedIndex;
+  final bool showLabels;
   final ValueChanged<int> onSelected;
 
   @override
@@ -131,8 +159,8 @@ class _AppTabBar extends StatelessWidget {
     final palette = context.palette;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     const items = [
-      (Icons.auto_awesome_rounded, '今日'),
       (Icons.calendar_month_outlined, '课表'),
+      (Icons.auto_awesome_rounded, '今日'),
       (Icons.tune_rounded, '设置'),
     ];
 
@@ -152,6 +180,7 @@ class _AppTabBar extends StatelessWidget {
                   child: _TabItem(
                     icon: items[index].$1,
                     label: items[index].$2,
+                    showLabel: showLabels,
                     selected: selectedIndex == index,
                     onTap: () => onSelected(index),
                   ),
@@ -168,12 +197,14 @@ class _TabItem extends StatelessWidget {
   const _TabItem({
     required this.icon,
     required this.label,
+    required this.showLabel,
     required this.selected,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final bool showLabel;
   final bool selected;
   final VoidCallback onTap;
 
@@ -234,16 +265,18 @@ class _TabItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                height: 1,
-                fontSize: 10,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                color: selected ? palette.text : palette.textSoft,
+            if (showLabel) ...[
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  height: 1,
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected ? palette.text : palette.textSoft,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

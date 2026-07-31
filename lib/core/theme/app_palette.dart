@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart';
 
 @immutable
 class AppPalette extends ThemeExtension<AppPalette> {
@@ -23,6 +24,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.danger,
     required this.track,
     required this.shadow,
+    required this.courseColors,
   });
 
   final Color canvas;
@@ -45,6 +47,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color danger;
   final Color track;
   final Color shadow;
+  final List<Color> courseColors;
 
   static const light = AppPalette(
     canvas: Color(0xFFF3F5F8),
@@ -67,6 +70,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     danger: Color(0xFFC73645),
     track: Color(0xFFE7EAF0),
     shadow: Color(0x14263246),
+    courseColors: _classicCourseColors,
   );
 
   static const dark = AppPalette(
@@ -90,7 +94,77 @@ class AppPalette extends ThemeExtension<AppPalette> {
     danger: Color(0xFFFF7D89),
     track: Color(0xFF29313E),
     shadow: Color(0x47000000),
+    courseColors: _classicCourseColors,
   );
+
+  static AppPalette resolve(YsPalette name, Brightness brightness) {
+    final base = brightness == Brightness.dark ? dark : light;
+    final isDark = brightness == Brightness.dark;
+    return switch (name) {
+      YsPalette.classic => base.copyWith(courseColors: ysPaletteColors(name)),
+      YsPalette.macaron => base.copyWith(
+        todayAccent: const Color(0xFFE7657C),
+        todayAccentSoft: isDark
+            ? const Color(0xFF43252F)
+            : const Color(0xFFFFE8ED),
+        scheduleAccent: const Color(0xFF1F9A83),
+        scheduleAccentSoft: isDark
+            ? const Color(0xFF193B36)
+            : const Color(0xFFDFF5EF),
+        blue: const Color(0xFF5277C8),
+        blueSoft: isDark ? const Color(0xFF252F49) : const Color(0xFFE7EDFA),
+        courseColors: ysPaletteColors(name),
+      ),
+      YsPalette.morandi => base.copyWith(
+        todayAccent: const Color(0xFF687D91),
+        todayAccentSoft: isDark
+            ? const Color(0xFF29333E)
+            : const Color(0xFFE5EBEF),
+        scheduleAccent: const Color(0xFF6E887A),
+        scheduleAccentSoft: isDark
+            ? const Color(0xFF29382F)
+            : const Color(0xFFE4ECE7),
+        warning: const Color(0xFF9A6C43),
+        courseColors: ysPaletteColors(name),
+      ),
+      YsPalette.cyber => base.copyWith(
+        todayAccent: const Color(0xFF008FA3),
+        todayAccentSoft: isDark
+            ? const Color(0xFF14363D)
+            : const Color(0xFFDDF5F7),
+        scheduleAccent: const Color(0xFFB4458D),
+        scheduleAccentSoft: isDark
+            ? const Color(0xFF3D2035)
+            : const Color(0xFFF8E3F0),
+        blue: const Color(0xFF2867C7),
+        courseColors: ysPaletteColors(name),
+      ),
+      YsPalette.forest => base.copyWith(
+        todayAccent: const Color(0xFF26725A),
+        todayAccentSoft: isDark
+            ? const Color(0xFF1B362D)
+            : const Color(0xFFDDEFE8),
+        scheduleAccent: const Color(0xFF3A7654),
+        scheduleAccentSoft: isDark
+            ? const Color(0xFF21382A)
+            : const Color(0xFFE2F0E6),
+        warning: const Color(0xFFC17A27),
+        courseColors: ysPaletteColors(name),
+      ),
+      YsPalette.sunset => base.copyWith(
+        todayAccent: const Color(0xFFD45B55),
+        todayAccentSoft: isDark
+            ? const Color(0xFF452723)
+            : const Color(0xFFFFE8E4),
+        scheduleAccent: const Color(0xFF397BA6),
+        scheduleAccentSoft: isDark
+            ? const Color(0xFF203545)
+            : const Color(0xFFE3F0F7),
+        warning: const Color(0xFFD4862D),
+        courseColors: ysPaletteColors(name),
+      ),
+    };
+  }
 
   @override
   AppPalette copyWith({
@@ -114,6 +188,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? danger,
     Color? track,
     Color? shadow,
+    List<Color>? courseColors,
   }) {
     return AppPalette(
       canvas: canvas ?? this.canvas,
@@ -136,6 +211,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       danger: danger ?? this.danger,
       track: track ?? this.track,
       shadow: shadow ?? this.shadow,
+      courseColors: courseColors ?? this.courseColors,
     );
   }
 
@@ -167,9 +243,23 @@ class AppPalette extends ThemeExtension<AppPalette> {
       danger: Color.lerp(danger, other.danger, t)!,
       track: Color.lerp(track, other.track, t)!,
       shadow: Color.lerp(shadow, other.shadow, t)!,
+      courseColors: t < 0.5 ? courseColors : other.courseColors,
     );
   }
 }
+
+const _classicCourseColors = <Color>[
+  Color(0xFFD1477A),
+  Color(0xFF5A68D8),
+  Color(0xFF0F9D8F),
+  Color(0xFFC07A1B),
+  Color(0xFF4B8BD4),
+  Color(0xFFB0538F),
+  Color(0xFF3F9D54),
+  Color(0xFF8A63C9),
+  Color(0xFFC25B3C),
+  Color(0xFF2F8FA8),
+];
 
 extension AppPaletteX on BuildContext {
   AppPalette get palette => Theme.of(this).extension<AppPalette>()!;

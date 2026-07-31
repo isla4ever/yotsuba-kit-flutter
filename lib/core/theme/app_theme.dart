@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:yotsuba_schedule/core/theme/app_palette.dart';
+import 'package:yotsuba_schedule_kit/yotsuba_schedule_kit.dart';
 
 class AppTheme {
   const AppTheme._();
 
-  static ThemeData light() {
-    return _build(Brightness.light, AppPalette.light);
+  static ThemeData light([YsPalette paletteName = YsPalette.classic]) {
+    return _build(
+      Brightness.light,
+      AppPalette.resolve(paletteName, Brightness.light),
+    );
   }
 
-  static ThemeData dark() {
-    return _build(Brightness.dark, AppPalette.dark);
+  static ThemeData dark([YsPalette paletteName = YsPalette.classic]) {
+    return _build(
+      Brightness.dark,
+      AppPalette.resolve(paletteName, Brightness.dark),
+    );
   }
 
   static ThemeData _build(Brightness brightness, AppPalette palette) {
